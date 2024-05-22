@@ -80,7 +80,7 @@ async def review_ping_check(members) :
     review_ping_channel = bot.fetch_channel(REVIEW_PING_CHANNEL_ID)
     for member in members :
         found_role_list = [role for role in member.roles if role.id == REVIEW_PING_ROLE_ID]
-        if any(found_role_list) :
+        if any(found_role_list) and (datetime.utcnow() - member.joined_at) > dt.timedelta(days = 5) :
             await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
             await member.remove_roles(found_role_list)
     return
