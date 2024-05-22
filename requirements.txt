@@ -1,0 +1,12 @@
+discord.py
+nest_asyncio
+typing
+flask
+mcstatus
+pyrebase4
+discord.py[voice]
+PyNaCl
+gtts
+pillow
+ffmpeg
+yt-dlp
