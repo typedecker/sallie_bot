@@ -12,7 +12,7 @@ import discord
 while __name__ == '__main__':
     try :
         bot.keep_alive()
-        bot.client.run(os.environ['BOT_TOKEN'])
+        bot.bot.run(os.environ['BOT_TOKEN'])
         bot.run()
     except discord.errors.HTTPException as e:
         print(e)
