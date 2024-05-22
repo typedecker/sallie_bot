@@ -139,7 +139,7 @@ async def on_message(message) :
         if voice_client == None :
             try :
                 voice_client = await message.author.voice.channel.connect()
-                audio_source = discord.FFmpegPCMAudio('temp_tts.mp3', executable = 'C:/Users/ketch/OneDrive/Desktop/nonu_imp/coding/misc/ffmpeg-master-latest-win64-gpl/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe')
+                audio_source = discord.FFmpegPCMAudio('temp_tts.mp3')
                 if not voice_client.is_playing():
                     voice_client.play(audio_source, after = None)
                 while voice_client.is_playing() :
@@ -151,7 +151,7 @@ async def on_message(message) :
                 else :
                     await message.channel.send('Could not connect to VC due to some issue.')
         else :
-            audio_source = discord.FFmpegPCMAudio('temp_tts.mp3', executable = 'C:/Users/ketch/OneDrive/Desktop/nonu_imp/coding/misc/ffmpeg-master-latest-win64-gpl/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe')
+            audio_source = discord.FFmpegPCMAudio('temp_tts.mp3')
             if not voice_client.is_playing():
                 voice_client.play(audio_source, after = None)
 
