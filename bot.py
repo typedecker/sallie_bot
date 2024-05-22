@@ -109,9 +109,9 @@ async def on_ready() :
         bot_owner = bot.get_user(BOT_OWNER_ID)
         if bot_owner.dm_channel == None :
             await bot_owner.create_dm()
-        await bot_owner.dm_channel.send('Gargling goblins bot has been deployed at {utc_time}'.format(utc_time = datetime.utcnow().strftime(datetime_date_format)))
+        await bot_owner.dm_channel.send('Sallie the salamander has been deployed at {utc_time}'.format(utc_time = datetime.utcnow().strftime(datetime_date_format)))
     except :
-        print('[on_ready func]: Ready action notif couldn\'t be sent to goblin sensei\'s owner.')
+        print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
     return
 
 @bot.event
