@@ -40,7 +40,8 @@ HELP_DICT = {
             'm_skip': ['$$m_skip', 'Skips the song currently being played, if any.'],
             'm_pause': ['$$m_pause', 'Pauses the song.'],
             'm_resume': ['$$m_resume', 'Resumes the song.'],
-            'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.']
+            'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.'],
+            'lb': ['$$lb <counter-type:slap|bump|levels>', 'Displays the leaderboards for the given counter-type.'],
             }
 
 YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
@@ -373,11 +374,11 @@ async def on_message(message) :
         
         embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = f'{lb_type.title()} Leaderboards', description = f'Given below is the leaderboard for {lb_type}ing:')
         
-        rank = 0
+        rank = 1
         for member_name in sorted(lb_data, key = lb_data.get, reverse = True) :
-            name = f'{rank}{member_name}'
+            name = f'{rank}. {member_name}'
             desc = f'{lb_data[member_name]} points'
-            embed.add_field(name = name, value = desc, inline = True)
+            embed.add_field(name = name, value = desc, inline = False)
             rank += 1
             continue
         await message.channel.send(embed = embed)
