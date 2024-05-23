@@ -380,7 +380,7 @@ async def on_message(message) :
             embed.add_field(name = name, value = desc, inline = True)
             rank += 1
             continue
-        message.channel.send(embed = embed)
+        await message.channel.send(embed = embed)
 
     return
 
