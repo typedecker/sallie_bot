@@ -192,7 +192,7 @@ def fetch_counter_data(counter_type) :
     
     salaslappers = firebase_db_obj.child(counter_type).get()
     for salaslapper, salaslapper_data in salaslappers.val().items() :
-        data[salaslapper_data['username']] = salaslapper_data['count']
+        data[salaslapper_data['username']] = salaslapper_data['count'] if 'count' in salaslapper_data else 0
         continue
     return data
 
