@@ -281,7 +281,7 @@ async def on_message(message) :
             if not voice_client.is_playing():
                 voice_client.play(audio_source, after = None)
     if message.content.lower().startswith('$$m_play') :
-        subquery = query[len('$$m_play') : ].strip()
+        subquery = message.content[len('$$m_play') : ].strip()
         response_obj = search_yt(subquery)
         music_queue.append(response_obj)
         if len(music_queue) >= 1 :
