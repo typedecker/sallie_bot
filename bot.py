@@ -251,16 +251,14 @@ async def on_message(message) :
             await message.channel.send(embed = embed)
     if message.content.lower() == '$$slap' :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
-        slap_count = firebase_db_obj.child('slap').child(str(message.author.id))
-        print(type(slap_count), slap_count)
-        if slap_count.get().val() == None :
-            slap_count = 0
-        else :
-            slap_count = slap_count.child('count').get().val()
-            # if slap_count == None :
-            #     slap_count = 0
+        
+        name = firebase_db_obj.child('slap').child(message.author.id).child('username').get().val()
+        count = firebase_db_obj.child('slap').child(message.author.id).child('count').get().val() # or 0
+        
+        print(name, count)
+        
         firebase_db_obj.child('slap').child(str(message.author.id)).child('username').set(message.author.name)
-        firebase_db_obj.child('slap').child(str(message.author.id)).child('count').set(slap_count + 1)
+        firebase_db_obj.child('slap').child(str(message.author.id)).child('count').set(count + 1)
         return
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
