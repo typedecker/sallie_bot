@@ -105,7 +105,7 @@ async def review_ping_check(members) :
     REVIEW_PING_CHANNEL_ID = 1242796180359086130
     
     review_ping_channel = bot.fetch_channel(REVIEW_PING_CHANNEL_ID)
-    for member in members :
+    async for member in members :
         found_role_list = [role for role in member.roles if role.id == REVIEW_PING_ROLE_ID]
         print(f'[LOG] Review availability is being examined for {member.name} right now... {(datetime.utcnow() - member.joined_at)}')
         if any(found_role_list) and (datetime.utcnow() - member.joined_at) > dt.timedelta(days = 5) :
