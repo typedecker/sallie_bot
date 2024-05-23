@@ -223,7 +223,7 @@ async def on_message(message) :
             await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
             
             name = firebase_db_obj.child('bump').child(message.author.id).child('username').get().val()
-            count = firebase_db_obj.child('bump').child(message.author.id).child('count').get().val() # or 0
+            count = firebase_db_obj.child('bump').child(message.author.id).child('count').get().val() or 0
             
             print(name, count)
             
@@ -254,7 +254,7 @@ async def on_message(message) :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
         
         name = firebase_db_obj.child('slap').child(message.author.id).child('username').get().val()
-        count = firebase_db_obj.child('slap').child(message.author.id).child('count').get().val() # or 0
+        count = firebase_db_obj.child('slap').child(message.author.id).child('count').get().val() or 0
         
         print(name, count)
         
