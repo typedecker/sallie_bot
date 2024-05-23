@@ -74,20 +74,25 @@ bot = discord.Client(intents = intents)
 voice_client = None
 
 async def review_ping_check(members) :
+    print('[LOG] Review ping check is under way.')
     REVIEW_PING_ROLE_ID = 1242796399754743808
     REVIEW_PING_CHANNEL_ID = 1242796180359086130
     
     review_ping_channel = bot.fetch_channel(REVIEW_PING_CHANNEL_ID)
     for member in members :
         found_role_list = [role for role in member.roles if role.id == REVIEW_PING_ROLE_ID]
+        print(f'[LOG] Review availability is being examined for {member.name} right now... {(datetime.utcnow() - member.joined_at)}')
         if any(found_role_list) and (datetime.utcnow() - member.joined_at) > dt.timedelta(days = 5) :
             await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
             await member.remove_roles(found_role_list)
     return
 
-@tasks.loop(hours = 12)
+@tasks.loop(time = [dt.time(hour = 6, minute = 0, second = 0, tzinfo = dt.timezone.utc),
+                    dt.time(hour = 12, minute = 0, second = 0, tzinfo = dt.timezone.utc),
+                    dt.time(hour = 18, minute = 0, second = 0, tzinfo = dt.timezone.utc)])
 async def bot_updatation() :
     # Called every 12 hours and does all the timed updatation that the bot needs.
+    print('[LOG] Bot Updatation is under way.')
     
     guild = await bot.fetch_guild(PET_OWNER_GUILD)
     members = guild.fetch_members()
@@ -135,6 +140,12 @@ async def on_message(message) :
         
     if message.content.lower() == '$$ping' :
         await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
+    if message.content.lower().startswith('$$help') :
+        query = message.content.lower()[len('$$help') : ].strip()
+        if query != '' :
+            pass
+        else :
+            pass
     if message.content.lower() == '$$slap' :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
         slap_count = firebase_db_obj.child('slap').child('count').child(message.author.name).get()
