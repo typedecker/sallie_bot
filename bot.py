@@ -34,7 +34,13 @@ HELP_DICT = {
             'confess': ['$$confess <confession>', 'Posts an anonymous confession message in the confessions channel of the server with the content provided, can be used via DMs as well.'],
             'vc_connect': ['$$vc_connect', 'Connects to the same VC as the user who executed the command.'],
             'vc_disconnect': ['$$vc_disconnect', 'Disconnects from any VC that she might be in.'],
-            'tts' : ['$$tts <message>', 'Converts the message from text to speech and plays it in VC.']
+            'tts' : ['$$tts <message>', 'Converts the message from text to speech and plays it in VC.'],
+            'm_play': ['$$m_play <query>', 'Searches for the query provided and plays it if it founds anything similar. If a song is already playing the new song will be added to the queue.'],
+            'm_queue': ['$$m_queue', 'Displays the queue of songs'],
+            'm_skip': ['$$m_skip', 'Skips the song currently being played, if any.'],
+            'm_pause': ['$$m_pause', 'Pauses the song.'],
+            'm_resume': ['$$m_resume', 'Resumes the song.'],
+            'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.']
             }
 
 YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
@@ -175,6 +181,35 @@ def play_next() :
 
 # ---------------------------------------------------------------------------------
 
+# --------------------------------------
+
+def fetch_counter_data(counter_type) :
+    global firebase_db_obj
+    
+    if counter_type not in ['bump', 'slap', 'levels'] : return {}
+    data = {}
+    
+    salaslappers = firebase_db_obj.child(counter_type).get()
+    for salaslapper, salaslapper_data in salaslappers.val().items() :
+        data[salaslapper_data['name']] = salaslapper_data['count']
+        continue
+    return
+
+def fetch_counter_leaderboard_str(counter_type) :
+    # LEVEL COUNTER NOT INCLUDED.
+    data = fetch_counter_data(counter_type)
+    
+    leaderboard_str = ''
+    
+    rank = 0
+    for data_key in sorted(data, key = data.get, reverse = True) :
+        leaderboard_str += f'{rank}.{data_key}: {data[data_key]} pts\n'
+        rank += 1
+        continue
+    return leaderboard_str
+
+# --------------------------------------
+
 @bot.event
 async def on_message(message) :
     global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused
@@ -185,14 +220,14 @@ async def on_message(message) :
         
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
-            bump_count = firebase_db_obj.child('bump').child(message.author.id)
+            bump_count = firebase_db_obj.child('bump').child(message.interaction.user.id)
             print(type(bump_count), bump_count)
             if bump_count.get().val() == None :
                 bump_count = 0
             else :
-                bump_count = bump_count.child('count').val()
-            firebase_db_obj.child('bump').child(message.author.id).child('username').set(message.author.name)
-            firebase_db_obj.child('bump').child(message.author.id).child('count').set(bump_count + 1)
+                bump_count = bump_count.child('count').get().val()
+            firebase_db_obj.child('bump').child(message.interaction.user.id).child('username').set(message.interaction.user.name)
+            firebase_db_obj.child('bump').child(message.interaction.user.id).child('count').set(bump_count + 1)
         return
         
     if message.content.lower() == '$$ping' :
@@ -221,7 +256,7 @@ async def on_message(message) :
         if slap_count.get().val() == None :
             slap_count = 0
         else :
-            slap_count = slap_count.child('count').val()
+            slap_count = slap_count.child('count').get().val()
         firebase_db_obj.child('slap').child(message.author.id).child('username').set(message.author.name)
         firebase_db_obj.child('slap').child(message.author.id).child('count').set(slap_count + 1)
         return
@@ -241,7 +276,6 @@ async def on_message(message) :
         try :
             voice_client = await message.author.voice.channel.connect()
             await message.channel.send('Connected to {vc_name}!'.format(vc_name = message.author.voice.channel.name))
-            # music_cmd_channel_id = message.channel.id
         except :
             if message.author.voice.channel == None :
                 await message.channel.send('You are not in a VC rn! Join a VC first!!')
@@ -326,13 +360,27 @@ async def on_message(message) :
     if message.content.lower() == '$$m_pause' :
         if voice_client and not voice_client.is_paused() : voice_client.pause()
         await message.channel.send('Paused the current song.')
-    if message.content.lower() == 'unpause' or message.content.lower() == '$$m_resume' :
+    if message.content.lower() == '$$m_unpause' or message.content.lower() == '$$m_resume' :
         if voice_client and voice_client.is_paused() : voice_client.resume()
         await message.channel.send('Resumed the current song.')
     if message.content.lower() == '$$m_queue' :
         queue_str = '\n'.join([str(i + 1) + '. ' + k['title'] for i, k in enumerate(music_queue)])
         if currently_playing : await message.channel.send('```\nQUEUE\n \nCurrently Playing: {0}\n \n{1}\n```'.format(currently_playing['title'], queue_str))
         else : await message.channel.send('```\nQUEUE\n \nCurrently Playing: Nothing\n \n{}\n```'.format(queue_str))
+    if message.content.lower.startswith('$$lb ') :
+        lb_type = message.content.lower()[len('$$lb ') : ]
+        lb_data = fetch_counter_data(lb_type)
+        
+        embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = f'{lb_type.title()} Leaderboards', description = f'Given below is the leaderboard for {lb_type}ing:')
+        
+        rank = 0
+        for member_name in sorted(lb_data, key = lb_data.get, reverse = True) :
+            name = f'{rank}{member_name}'
+            desc = f'{lb_data[member_name]} points'
+            embed.add_field(name = name, value = desc, inline = True)
+            rank += 1
+            continue
+        message.channel.send(embed = embed)
 
     return
 
