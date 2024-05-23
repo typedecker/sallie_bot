@@ -113,9 +113,10 @@ async def review_ping_check(members) :
             await member.remove_roles(found_role_list)
     return
 
-@tasks.loop(time = [dt.time(hour = 6, minute = 0, second = 0, tzinfo = dt.timezone.utc),
-                    dt.time(hour = 12, minute = 0, second = 0, tzinfo = dt.timezone.utc),
-                    dt.time(hour = 18, minute = 0, second = 0, tzinfo = dt.timezone.utc)])
+# @tasks.loop(time = [dt.time(hour = 6, minute = 0, second = 0, tzinfo = dt.timezone.utc),
+#                     dt.time(hour = 12, minute = 0, second = 0, tzinfo = dt.timezone.utc),
+#                     dt.time(hour = 18, minute = 0, second = 0, tzinfo = dt.timezone.utc)])
+@tasks.loop(minutes = 5)
 async def bot_updatation() :
     # Called every 12 hours and does all the timed updatation that the bot needs.
     print('[LOG] Bot Updatation is under way.')
