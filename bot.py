@@ -14,6 +14,7 @@ from gtts import gTTS
 from flask import Flask
 from datetime import datetime
 from threading import Thread
+from yt_dlp import YoutubeDL
 
 import datetime as dt
 
@@ -35,6 +36,9 @@ HELP_DICT = {
             'vc_disconnect': ['$$vc_disconnect', 'Disconnects from any VC that she might be in.'],
             'tts' : ['$$tts <message>', 'Converts the message from text to speech and plays it in VC.']
             }
+
+YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
+FFMPEG_OPTIONS = {'before_options' : '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options' : '-vn'}
 
 # -------------------------------
 app = Flask('')
@@ -83,6 +87,10 @@ intents = discord.Intents.all()
 bot = discord.Client(intents = intents)
 
 voice_client = None
+currently_playing = None
+music_cmd_channel_id = None
+is_playing, is_paused = False, True
+music_queue = []
 
 async def review_ping_check(members) :
     print('[LOG] Review ping check is under way.')
@@ -130,9 +138,46 @@ async def on_ready() :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
     return
 
+# ---------------------------------------------------------------------------------
+
+def search_yt(item):
+    global YDL_OPTIONS
+    
+    with YoutubeDL(YDL_OPTIONS) as ydl :
+        try: 
+            info = ydl.extract_info("ytsearch:%s" % item, download=False)['entries'][0]
+        except Exception: 
+            return False
+    return {'source': info['url'], 'title': info['title']}
+
+async def display_currently_playing_song() :
+    global client, currently_playing, music_cmd_channel_id
+    if not music_cmd_channel_id or currently_playing : return
+    music_channel = await client.fetch_channel(music_cmd_channel_id)
+    await music_channel.send('[uwu]Now playing: {}'.format(currently_playing['title']))
+    return
+
+def play_next() :
+    global bot, voice_client, music_queue, is_playing, is_paused, currently_playing
+    
+    is_playing = True
+    if len(music_queue) > 0 :
+        response_obj = music_queue.pop(0)
+        m_url, song_title = response_obj['source'], response_obj['title']
+        voice_client.play(discord.FFmpegPCMAudio(m_url, **FFMPEG_OPTIONS), after = lambda x : play_next())
+        currently_playing = response_obj.copy()
+        asyncio.create_task(display_currently_playing_song())
+        return response_obj
+    else :
+        currently_playing = None
+        return None
+    return
+
+# ---------------------------------------------------------------------------------
+
 @bot.event
 async def on_message(message) :
-    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction != None :
@@ -140,13 +185,14 @@ async def on_message(message) :
         
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
-            bump_count = firebase_db_obj.child('bump').child('count').child(message.author.id).get()
+            bump_count = firebase_db_obj.child('bump').child(message.author.id).get()
             print(type(bump_count), bump_count)
             if bump_count == None :
                 bump_count = 0
             else :
-                bump_count = bump_count.val()
-            firebase_db_obj.child('bump').child('count').child(message.author.id).set(bump_count + 1)
+                bump_count = bump_count.child('count').val()
+            firebase_db_obj.child('bump').child(message.author.id).child('username').set(message.author.name)
+            firebase_db_obj.child('bump').child(message.author.id).child('count').set(bump_count + 1)
         return
         
     if message.content.lower() == '$$ping' :
@@ -170,13 +216,14 @@ async def on_message(message) :
             await message.channel.send(embed = embed)
     if message.content.lower() == '$$slap' :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
-        slap_count = firebase_db_obj.child('slap').child('count').child(message.author.id).get()
+        slap_count = firebase_db_obj.child('slap').child(message.author.id).get()
         print(type(slap_count), slap_count)
-        if slap_count.val() == None :
+        if slap_count == None :
             slap_count = 0
         else :
-            slap_count = slap_count.val()
-        firebase_db_obj.child('slap').child('count').child(message.author.id).set(slap_count + 1)
+            slap_count = slap_count.child('count').val()
+        firebase_db_obj.child('slap').child(message.author.id).child('username').set(message.author.name)
+        firebase_db_obj.child('slap').child(message.author.id).child('count').set(slap_count + 1)
         return
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
@@ -233,6 +280,59 @@ async def on_message(message) :
             audio_source = discord.FFmpegPCMAudio('temp_tts.mp3')
             if not voice_client.is_playing():
                 voice_client.play(audio_source, after = None)
+    if message.content.lower().startswith('$$m_play') :
+        subquery = query[len('$$m_play') : ].strip()
+        response_obj = search_yt(subquery)
+        music_queue.append(response_obj)
+        if len(music_queue) >= 1 :
+            if voice_client :
+                if voice_client.is_playing() :
+                    await message.channel.send('Added to queue the song named : {}'.format(response_obj['title']))
+        if voice_client :
+            if not voice_client.is_playing() :
+                response = play_next()
+                if not response : await message.channel.send('There were no more songs left in queue to play.')
+                else :
+                    await message.channel.send('Now playing: {}'.format(response['title']))
+        else :
+            if message.author.voice :
+                requested_vc = message.author.voice.channel
+                voice_client = await requested_vc.connect()
+                response = play_next()
+                if not response : await message.channel.send('There were no more songs left in queue to play.')
+                else :
+                    await message.channel.send('Now playing: {}'.format(response['title']))
+            else :
+                music_queue.pop(-1)
+                await message.channel.send('You are not in any VC! Join a VC to request a song.')
+    if message.content.lower() == '$$m_skip' :
+        if voice_client :
+            if voice_client.is_playing() :
+                if music_queue == 0 : currently_playing = None
+                voice_client.stop()
+                await message.channel.send('Skipped the current song.')
+                if currently_playing : await message.channel.send('Now playing: {}'.format(currently_playing['title']))
+        else :
+            if message.author.voice :
+                requested_vc = message.author.voice.channel
+                voice_client = await requested_vc.connect()
+                response = play_next()
+                if not response : await message.channel.send('There were no more songs left in queue to play.')
+                else :
+                    await message.channel.send('Now playing: {}'.format(response['title']))
+                await message.channel.send('Skipped the current song.')
+            else :
+                await message.channel.send('You are not in any VC! Join a VC to request a song.')
+    if message.content.lower() == '$$m_pause' :
+        if voice_client and not voice_client.is_paused() : voice_client.pause()
+        await message.channel.send('Paused the current song.')
+    if message.content.lower() == 'unpause' or message.content.lower() == '$$m_resume' :
+        if voice_client and voice_client.is_paused() : voice_client.resume()
+        await message.channel.send('Resumed the current song.')
+    if message.content.lower() == '$$m_queue' :
+        queue_str = '\n'.join([str(i + 1) + '. ' + k['title'] for i, k in enumerate(music_queue)])
+        if currently_playing : await message.channel.send('```\nQUEUE\n \nCurrently Playing: {0}\n \n{1}\n```'.format(currently_playing['title'], queue_str))
+        else : await message.channel.send('```\nQUEUE\n \nCurrently Playing: Nothing\n \n{}\n```'.format(queue_str))
 
     return
 
