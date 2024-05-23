@@ -124,15 +124,26 @@ async def on_message(message) :
         
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
+            bump_count = firebase_db_obj.child('bump').child('count').child(message.author.name).get()
+            print(type(bump_count), bump_count)
+            if bump_count == None :
+                bump_count = 0
+            else :
+                bump_count = bump_count.val()
+            firebase_db_obj.child('bump').child('count').child(message.author.name).set(bump_count + 1)
         return
         
     if message.content.lower() == '$$ping' :
         await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
     if message.content.lower() == '$$slap' :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
-        poo = firebase_db_obj.child('slap').child('count').get().val()
-        firebase_db_obj.child('slap').child('count').child(message.author.name).set(poo + 1)
-        print(type(poo))
+        slap_count = firebase_db_obj.child('slap').child('count').child(message.author.name).get()
+        print(type(slap_count), slap_count)
+        if slap_count == None :
+            slap_count = 0
+        else :
+            slap_count = slap_count.val()
+        firebase_db_obj.child('slap').child('count').child(message.author.name).set(slap_count + 1)
         return
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
