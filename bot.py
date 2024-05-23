@@ -164,7 +164,7 @@ async def on_message(message) :
             embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = 'Sallie-Help', description = 'Sallie is here to help ya play with her :D! Heres a list of things sallie can do:')
             for name, desc in HELP_DICT.items() :
                 desc = desc if len(desc) <= 1024 else desc[ : 1024]
-                embed.add_field(name, desc, False)
+                embed.add_field(name = name, value = desc, inline = False)
                 continue
             await message.channel.send(embed = embed)
     if message.content.lower() == '$$slap' :
