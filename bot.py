@@ -251,12 +251,14 @@ async def on_message(message) :
             await message.channel.send(embed = embed)
     if message.content.lower() == '$$slap' :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
-        slap_count = firebase_db_obj.child('slap').child(message.author.id)
+        slap_count = firebase_db_obj.child('slap').child(str(message.author.id))
         print(type(slap_count), slap_count)
         if slap_count.get().val() == None :
             slap_count = 0
         else :
             slap_count = slap_count.child('count').get().val()
+            # if slap_count == None :
+            #     slap_count = 0
         firebase_db_obj.child('slap').child(str(message.author.id)).child('username').set(message.author.name)
         firebase_db_obj.child('slap').child(str(message.author.id)).child('count').set(slap_count + 1)
         return
@@ -367,7 +369,7 @@ async def on_message(message) :
         queue_str = '\n'.join([str(i + 1) + '. ' + k['title'] for i, k in enumerate(music_queue)])
         if currently_playing : await message.channel.send('```\nQUEUE\n \nCurrently Playing: {0}\n \n{1}\n```'.format(currently_playing['title'], queue_str))
         else : await message.channel.send('```\nQUEUE\n \nCurrently Playing: Nothing\n \n{}\n```'.format(queue_str))
-    if message.content.lower.startswith('$$lb ') :
+    if message.content.lower().startswith('$$lb ') :
         lb_type = message.content.lower()[len('$$lb ') : ]
         lb_data = fetch_counter_data(lb_type)
         
