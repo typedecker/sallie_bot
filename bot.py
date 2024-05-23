@@ -140,13 +140,13 @@ async def on_message(message) :
         
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
-            bump_count = firebase_db_obj.child('bump').child('count').child(message.author.name).get()
+            bump_count = firebase_db_obj.child('bump').child('count').child(message.author.id).get()
             print(type(bump_count), bump_count)
             if bump_count == None :
                 bump_count = 0
             else :
                 bump_count = bump_count.val()
-            firebase_db_obj.child('bump').child('count').child(message.author.name).set(bump_count + 1)
+            firebase_db_obj.child('bump').child('count').child(message.author.id).set(bump_count + 1)
         return
         
     if message.content.lower() == '$$ping' :
@@ -162,20 +162,21 @@ async def on_message(message) :
                 await message.channel.send(embed = embed)
         else :
             embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = 'Sallie-Help', description = 'Sallie is here to help ya play with her :D! Heres a list of things sallie can do:')
-            for name, desc in HELP_DICT.items() :
+            for query, query_data in HELP_DICT.items() :
+                name, desc = query_data
                 desc = desc if len(desc) <= 1024 else desc[ : 1024]
                 embed.add_field(name = name, value = desc, inline = False)
                 continue
             await message.channel.send(embed = embed)
     if message.content.lower() == '$$slap' :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
-        slap_count = firebase_db_obj.child('slap').child('count').child(message.author.name).get()
+        slap_count = firebase_db_obj.child('slap').child('count').child(message.author.id).get()
         print(type(slap_count), slap_count)
         if slap_count.val() == None :
             slap_count = 0
         else :
             slap_count = slap_count.val()
-        firebase_db_obj.child('slap').child('count').child(message.author.name).set(slap_count + 1)
+        firebase_db_obj.child('slap').child('count').child(message.author.id).set(slap_count + 1)
         return
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
