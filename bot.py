@@ -221,14 +221,14 @@ async def on_message(message) :
         
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
-            bump_count = firebase_db_obj.child('bump').child(str(message.interaction.user.id))
-            print(type(bump_count), bump_count)
-            if bump_count.get().val() == None :
-                bump_count = 0
-            else :
-                bump_count = bump_count.child('count').get().val()
-            firebase_db_obj.child('bump').child(str(message.interaction.user.id)).child('username').set(message.interaction.user.name)
-            firebase_db_obj.child('bump').child(str(message.interaction.user.id)).child('count').set(bump_count + 1)
+            
+            name = firebase_db_obj.child('bump').child(message.author.id).child('username').get().val()
+            count = firebase_db_obj.child('bump').child(message.author.id).child('count').get().val() # or 0
+            
+            print(name, count)
+            
+            firebase_db_obj.child('bump').child(str(message.author.id)).child('username').set(message.author.name)
+            firebase_db_obj.child('bump').child(str(message.author.id)).child('count').set(count + 1)
         return
         
     if message.content.lower() == '$$ping' :
