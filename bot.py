@@ -127,7 +127,7 @@ async def bot_updatation() :
     # Assign levels based on people's messages.
     
     # Checks for the review ping roles
-    review_ping_check(members)
+    await review_ping_check(members)
     return
 
 @bot.event
