@@ -116,7 +116,7 @@ async def review_ping_check(members) :
 # @tasks.loop(time = [dt.time(hour = 6, minute = 0, second = 0, tzinfo = dt.timezone.utc),
 #                     dt.time(hour = 12, minute = 0, second = 0, tzinfo = dt.timezone.utc),
 #                     dt.time(hour = 18, minute = 0, second = 0, tzinfo = dt.timezone.utc)])
-@tasks.loop(minutes = 5)
+@tasks.loop(hours = 6)
 async def bot_updatation() :
     # Called every 12 hours and does all the timed updatation that the bot needs.
     print('[LOG] Bot Updatation is under way.')
@@ -144,6 +144,8 @@ async def on_ready() :
         await bot_owner.dm_channel.send('Sallie the salamander has been deployed at {utc_time}'.format(utc_time = datetime.utcnow().strftime(datetime_date_format)))
     except :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
+    
+    bot_updatation.start()
     return
 
 # ---------------------------------------------------------------------------------
