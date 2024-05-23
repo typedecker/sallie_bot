@@ -230,7 +230,7 @@ async def on_message(message) :
             
             print(name, count)
             
-            firebase_db_obj.child('bump').child(str(message.interaction.user.id)).child('username').set(message.author.name)
+            firebase_db_obj.child('bump').child(str(message.interaction.user.id)).child('username').set(message.interaction.user.name)
             firebase_db_obj.child('bump').child(str(message.interaction.user.id)).child('count').set(count + 1)
         return
         
