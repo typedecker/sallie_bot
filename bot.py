@@ -21,9 +21,20 @@ os.environ['PATH'] = os.environ['PATH'] + ';' + os.path.abspath('assets')
 import ffmpeg
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
+SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
 CONFESSION_CHANNEL_ID = 1239309061585899572
 BOT_OWNER_ID = 568446269610000385
 PET_OWNER_GUILD = 1230967641200394302
+
+HELP_DICT = {
+            'ping': ['$$ping', 'Pong! Returns the ping in milliseconds for the bot.'],
+            'help': ['$$help <optional:query>', 'Provided with a list of all commands available, if the optionary query is provided then it describes the command being queried.'],
+            'slap': ['$$slap', 'Slaps sallie and rewards you with exp points(W.I.P.)'],
+            'confess': ['$$confess <confession>', 'Posts an anonymous confession message in the confessions channel of the server with the content provided, can be used via DMs as well.'],
+            'vc_connect': ['$$vc_connect', 'Connects to the same VC as the user who executed the command.'],
+            'vc_disconnect': ['$$vc_disconnect', 'Disconnects from any VC that she might be in.'],
+            'tts' : ['$$tts <message>', 'Converts the message from text to speech and plays it in VC.']
+            }
 
 # -------------------------------
 app = Flask('')
@@ -121,7 +132,7 @@ async def on_ready() :
 
 @bot.event
 async def on_message(message) :
-    global voice_client
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction != None :
@@ -143,14 +154,24 @@ async def on_message(message) :
     if message.content.lower().startswith('$$help') :
         query = message.content.lower()[len('$$help') : ].strip()
         if query != '' :
-            pass
+            if query not in HELP_DICT :
+                await message.channel.send('The query provided is invalid, there is no such command or cog available for sallie!')
+            else :
+                help_data = HELP_DICT[query]
+                embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = help_data[0], description = help_data[1])
+                await message.channel.send(embed = embed)
         else :
-            pass
+            embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = 'Sallie-Help', description = 'Sallie is here to help ya play with her :D! Heres a list of things sallie can do:')
+            for name, desc in HELP_DICT.items() :
+                desc = desc if len(desc) <= 1024 else desc[ : 1024]
+                embed.add_field(name, desc, False)
+                continue
+            await message.channel.send(embed = embed)
     if message.content.lower() == '$$slap' :
         await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
         slap_count = firebase_db_obj.child('slap').child('count').child(message.author.name).get()
         print(type(slap_count), slap_count)
-        if slap_count == None :
+        if slap_count.val() == None :
             slap_count = 0
         else :
             slap_count = slap_count.val()
@@ -158,7 +179,7 @@ async def on_message(message) :
         return
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
-        embed = discord.Embed(color = discord.Colour.from_str('#F05E22'), title = 'Anonymous Confession', description = confession)
+        embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = 'Anonymous Confession', description = confession)
         confession_channel = await bot.fetch_channel(CONFESSION_CHANNEL_ID)
         confession_msg = await confession_channel.send(embed = embed)
         if not isinstance(message.channel, discord.DMChannel) :
