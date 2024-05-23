@@ -193,7 +193,7 @@ def fetch_counter_data(counter_type) :
     for salaslapper, salaslapper_data in salaslappers.val().items() :
         data[salaslapper_data['username']] = salaslapper_data['count']
         continue
-    return
+    return data
 
 def fetch_counter_leaderboard_str(counter_type) :
     # LEVEL COUNTER NOT INCLUDED.
