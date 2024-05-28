@@ -110,7 +110,7 @@ async def review_ping_check(members) :
         print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at)}')
         if any(found_role_list) and (datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
             await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
-            await member.remove_roles(found_role_list)
+            await member.remove_roles(*found_role_list)
     return
 
 # @tasks.loop(time = [dt.time(hour = 6, minute = 0, second = 0, tzinfo = dt.timezone.utc),
@@ -146,6 +146,12 @@ async def on_ready() :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
     
     bot_updatation.start()
+    return
+
+@bot.event
+async def on_resume() :
+    if not bot_updatation.is_running() :
+        bot_updatation.start()
     return
 
 # ---------------------------------------------------------------------------------
