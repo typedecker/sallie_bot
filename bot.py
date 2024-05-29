@@ -42,6 +42,7 @@ HELP_DICT = {
             'm_resume': ['$$m_resume', 'Resumes the song.'],
             'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.'],
             'lb': ['$$lb <counter-type:slap|bump|levels>', 'Displays the leaderboards for the given counter-type.'],
+            'revive': ['$$revive @person1 @person2 ...', 'Sends a sweet revival message to whoever is pinged in their DMs.'],
             }
 
 YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
@@ -110,7 +111,7 @@ async def review_ping_check(members) :
         print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at)}')
         if any(found_role_list) and (datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
             await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
-            await member.remove_roles(*found_role_list)
+            # await member.remove_roles(*found_role_list)
     return
 
 # @tasks.loop(time = [dt.time(hour = 6, minute = 0, second = 0, tzinfo = dt.timezone.utc),
@@ -391,6 +392,22 @@ async def on_message(message) :
             rank += 1
             continue
         await message.channel.send(embed = embed)
+    if message.content.lower().startswith('$$revive') :
+        list_of_revivals = []
+        for mention in message.mentions :
+            if mention == message.author : continue
+            if mention.dm_channel == None :
+                await mention.create_dm()
+            try :
+                await mention.dm_channel.send('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + message.channel.mention)
+                list_of_revivals.append(mention.name)
+            except :
+                pass
+            continue
+        if list_of_revivals :
+            await message.channel.send('Revival message sent to {revivals}!'.format(revivals = ', '.join(list_of_revivals)))
+        else :
+            await message.channel.send('You cannot revive yourself silly! You are already alive!! Grrrr')
 
     return
 
