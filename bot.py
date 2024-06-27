@@ -228,7 +228,7 @@ async def on_message(message) :
     global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
-    if message.interaction != None :
+    if message.interaction != None : 
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
             
