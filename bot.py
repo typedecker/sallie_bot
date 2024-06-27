@@ -228,19 +228,17 @@ async def on_message(message) :
     global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
-    if message.interaction_metadata != None :
-        print(f'INTERACTION DETECTED SEXY BOI {message.content} | {message.interaction_metadata.interacted_message.content} | {message.interaction_metadata.user.name} | {message.interaction.name}')
-        
+    if message.interaction != None :
         if message.interaction.name == 'bump' :
-            await message.channel.send(f'HEY THANKS {message.interaction_metadata.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
+            await message.channel.send(f'HEY THANKS {message.interaction.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
             
-            name = firebase_db_obj.child('bump').child(message.interaction_metadata.user.id).child('username').get().val()
-            count = firebase_db_obj.child('bump').child(message.interaction.metadata.user.id).child('count').get().val() or 0
+            name = firebase_db_obj.child('bump').child(message.interaction.user.id).child('username').get().val()
+            count = firebase_db_obj.child('bump').child(message.interaction.user.id).child('count').get().val() or 0
             
             print(name, count)
             
-            firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('username').set(message.interaction_metadata.user.name)
-            firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('count').set(count + 1)
+            firebase_db_obj.child('bump').child(str(message.interaction.user.id)).child('username').set(message.interaction.user.name)
+            firebase_db_obj.child('bump').child(str(message.interaction.user.id)).child('count').set(count + 1)
         return
         
     if message.content.lower() == '$$ping' :
