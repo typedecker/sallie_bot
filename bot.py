@@ -17,6 +17,7 @@ from threading import Thread
 from yt_dlp import YoutubeDL
 
 import datetime as dt
+import ratelimit_handler as rh
 
 os.environ['PATH'] = os.environ['PATH'] + ';' + os.path.abspath('assets')
 import ffmpeg
@@ -96,36 +97,45 @@ firebase_db_obj = firebase_client.database() # Initializes the firebase database
 intents = discord.Intents.all()
 bot = discord.Client(intents = intents)
 
+ratelimiter = rh.RateLimiter(unit_time = 5000, default_rl = 1)
+
 voice_client = None
 currently_playing = None
 music_cmd_channel_id = None
 is_playing, is_paused = False, True
 music_queue = []
 
+async def review_ping_check_iteration(member, review_ping_channel) :
+    REVIEW_PING_ROLE_ID = 1242796399754743808
+    
+    found_role_list = [role for role in member.roles if role.id == REVIEW_PING_ROLE_ID]
+    print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at)}')
+    if any(found_role_list) and (datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
+        await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
+        # await member.remove_roles(*found_role_list)
+    return
+
 async def review_ping_check(members) :
     print('[LOG] Review ping check is under way.')
-    REVIEW_PING_ROLE_ID = 1242796399754743808
     REVIEW_PING_CHANNEL_ID = 1242796180359086130
     
     review_ping_channel = await bot.fetch_channel(REVIEW_PING_CHANNEL_ID)
-    async for member in members :
-        found_role_list = [role for role in member.roles if role.id == REVIEW_PING_ROLE_ID]
-        print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at)}')
-        if any(found_role_list) and (datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
-            await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
-            # await member.remove_roles(*found_role_list)
+    for member in members :
+        ratelimited_iteration = ratelimiter.handle(func = review_ping_check_iteration, default_rl = 1)
+        await ratelimited_iteration(member, review_ping_channel)
+        continue
     return
 
 # @tasks.loop(time = [dt.time(hour = 6, minute = 0, second = 0, tzinfo = dt.timezone.utc),
 #                     dt.time(hour = 12, minute = 0, second = 0, tzinfo = dt.timezone.utc),
 #                     dt.time(hour = 18, minute = 0, second = 0, tzinfo = dt.timezone.utc)])
-@tasks.loop(hours = 6)
+@tasks.loop(hours = 12)
 async def bot_updatation() :
     # Called every 12 hours and does all the timed updatation that the bot needs.
     print('[LOG] Bot Updatation is under way.')
     
     guild = await bot.fetch_guild(PET_OWNER_GUILD)
-    members = guild.fetch_members()
+    members = [member async for member in guild.fetch_members()]
     
     # Assign levels based on people's messages.
     
@@ -229,7 +239,7 @@ async def on_message(message) :
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
-        print(f'INTERACTION DETECTED SEXY BOI {message.content} | {message.interaction_metadata.interacted_message.content} | {message.interaction_metadata.user.name} | {message.interaction.name}')
+        print(f'INTERACTION DETECTED SEXY BOI {message.content} | {message.interaction_metadata.interacted_message.content} | {message.interaction_metadata.user.name} | {message.interaction.name} | {message.interaction_metadata.name}')
         
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction_metadata.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
