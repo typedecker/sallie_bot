@@ -288,7 +288,7 @@ async def on_message(message) :
             await message.channel.send(f'HEY THANKS {message.interaction_metadata.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
             
             name = firebase_db_obj.child('bump').child(message.interaction_metadata.user.id).child('username').get().val()
-            count = firebase_db_obj.child('bump').child(message.interaction.metadata.user.id).child('count').get().val() or 0
+            count = firebase_db_obj.child('bump').child(message.interaction_metadata.user.id).child('count').get().val() or 0
             
             print(name, count)
             
