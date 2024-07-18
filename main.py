@@ -8,11 +8,12 @@ Created on Thu May 23 02:31:45 2024
 import bot
 import os
 import discord
+import asyncio
 
 while __name__ == '__main__':
     try :
         bot.keep_alive()
-        bot.bot.run(os.environ['BOT_TOKEN'])
+        asyncio.run(bot.BOT_MAIN_FUNC(os.environ['BOT_TOKEN']))
         bot.run()
     except discord.errors.HTTPException as e:
         print(e)

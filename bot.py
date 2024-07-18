@@ -19,8 +19,48 @@ from yt_dlp import YoutubeDL
 import datetime as dt
 import ratelimit_handler as rh
 
+# ---
 os.environ['PATH'] = os.environ['PATH'] + ';' + os.path.abspath('assets')
 import ffmpeg
+
+# ----
+
+# shorthand for the class whose __del__ raises the exception
+_BEL = asyncio.base_events.BaseEventLoop
+
+_original_del = _BEL.__del__
+
+def _patched_del(self):
+    try:
+        # invoke the original method...
+        _original_del(self)
+    except:
+        # ... but ignore any exceptions it might raise
+        # NOTE: horrible anti-pattern
+        pass
+
+# replace the original __del__ method
+_BEL.__del__ = _patched_del
+
+# ----
+
+_Task_Class = asyncio.Task
+
+_original_del = _Task_Class.__del__
+
+def _patched_del(self):
+    try:
+        # invoke the original method...
+        _original_del(self)
+    except:
+        # ... but ignore any exceptions it might raise
+        # NOTE: horrible anti-pattern
+        pass
+
+# replace the original __del__ method
+_Task_Class.__del__ = _patched_del
+
+# ---
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
@@ -54,7 +94,7 @@ app = Flask('')
 
 @app.route('/')
 def main():
-    return "Status: Online(Deployed at {utc_time})".format(utc_time = datetime.utcnow().strftime(datetime_date_format))
+    return "Status: Online(Deployed at {utc_time})".format(utc_time = datetime.now(dt.UTC).strftime(datetime_date_format))
 
 def run() :
     PORT = 49152
@@ -109,8 +149,8 @@ async def review_ping_check_iteration(member, review_ping_channel) :
     REVIEW_PING_ROLE_ID = 1242796399754743808
     
     found_role_list = [role for role in member.roles if role.id == REVIEW_PING_ROLE_ID]
-    print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at)}')
-    if any(found_role_list) and (datetime.utcnow().astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
+    print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.now(dt.UTC).astimezone(dt.timezone.utc) - member.joined_at)}')
+    if any(found_role_list) and (datetime.now(dt.UTC).astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
         await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
         # await member.remove_roles(*found_role_list)
     return
@@ -154,7 +194,7 @@ async def on_ready() :
         bot_owner = bot.get_user(BOT_OWNER_ID)
         if bot_owner.dm_channel == None :
             await bot_owner.create_dm()
-        await bot_owner.dm_channel.send('Sallie the salamander has been deployed at {utc_time}'.format(utc_time = datetime.utcnow().strftime(datetime_date_format)))
+        await bot_owner.dm_channel.send('Sallie the salamander has been deployed at {utc_time}'.format(utc_time = datetime.now(dt.UTC).strftime(datetime_date_format)))
     except :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
     
@@ -174,16 +214,19 @@ def search_yt(item):
     
     with YoutubeDL(YDL_OPTIONS) as ydl :
         try: 
-            info = ydl.extract_info("ytsearch:%s" % item, download=False)['entries'][0]
+            info = ydl.extract_info("ytsearch:%s" % item, download = False)['entries'][0]
         except Exception: 
             return False
     return {'source': info['url'], 'title': info['title']}
 
 async def display_currently_playing_song() :
     global client, currently_playing, music_cmd_channel_id
+    
     if not music_cmd_channel_id or currently_playing : return
+    
     music_channel = await client.fetch_channel(music_cmd_channel_id)
     await music_channel.send('[uwu]Now playing: {}'.format(currently_playing['title']))
+    
     return
 
 def play_next() :
@@ -239,7 +282,7 @@ async def on_message(message) :
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
-        print(f'INTERACTION DETECTED SEXY BOI {message.content} | {message.interaction_metadata.interacted_message.content} | {message.interaction_metadata.user.name} | {message.interaction.name} | {message.interaction_metadata.name}')
+        print(f'INTERACTION DETECTED SEXY BOI {message.content} | {message.interaction_metadata.interacted_message} | {message.interaction_metadata.user.name} | {message.interaction.name}')
         
         if message.interaction.name == 'bump' :
             await message.channel.send(f'HEY THANKS {message.interaction_metadata.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
@@ -423,6 +466,10 @@ async def on_message(message) :
 
     return
 
+async def BOT_MAIN_FUNC(BOT_TOKEN) :
+    bot.run(BOT_TOKEN)
+    return
+
 if __name__ == '__main__' :
     BOT_TOKEN = os.environ['BOT_TOKEN']
-    bot.run(BOT_TOKEN)
+    asyncio.run(BOT_MAIN_FUNC(BOT_TOKEN))

@@ -7,6 +7,45 @@ Created on Mon Jul  8 03:10:27 2024
 
 import asyncio, copy
 
+# ---
+
+# shorthand for the class whose __del__ raises the exception
+_BEL = asyncio.base_events.BaseEventLoop
+
+_original_del = _BEL.__del__
+
+def _patched_del(self):
+    try:
+        # invoke the original method...
+        _original_del(self)
+    except:
+        # ... but ignore any exceptions it might raise
+        # NOTE: horrible anti-pattern
+        pass
+
+# replace the original __del__ method
+_BEL.__del__ = _patched_del
+
+# ----
+
+_Task_Class = asyncio.Task
+
+_original_del = _Task_Class.__del__
+
+def _patched_del(self):
+    try:
+        # invoke the original method...
+        _original_del(self)
+    except:
+        # ... but ignore any exceptions it might raise
+        # NOTE: horrible anti-pattern
+        pass
+
+# replace the original __del__ method
+_Task_Class.__del__ = _patched_del
+
+# ---
+
 class RateLimiter() :
     def __init__(self, unit_time = 1000, default_rl = 10) :
         self.unit_time = unit_time # In milliseconds
@@ -41,11 +80,11 @@ class RateLimiter() :
                         self.requests[func_name]['reset_request_task'].cancel()
                         try :
                             await self.requests[func_name]['reset_request_task']
-                        except asyncio.CancelledError :
+                        except (asyncio.CancelledError, AttributeError) :
                             pass
                         
-                        del self.requests[func_name]
                         self.requests[func_name]['freed?'] = True
+                        del self.requests[func_name]
                     break
             continue
         return
