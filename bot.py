@@ -5,6 +5,10 @@ Created on Tue May 21 20:02:05 2024
 @author: ketch
 """
 
+# ENVIRONMENT_TYPE = 'DEV'
+ENVIRONMENT_TYPE = 'PROD'
+print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
+
 import nest_asyncio
 nest_asyncio.apply()
 
@@ -15,6 +19,7 @@ from flask import Flask
 from datetime import datetime
 from threading import Thread
 from yt_dlp import YoutubeDL
+from markupsafe import escape
 
 import datetime as dt
 import ratelimit_handler as rh
@@ -89,12 +94,36 @@ HELP_DICT = {
 YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
 FFMPEG_OPTIONS = {'before_options' : '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options' : '-vn'}
 
+# -------
+
+BOT_READY, DB_READY = False, False
+BOT_START_TIME = datetime.now(dt.UTC).strftime(datetime_date_format)
+
 # -------------------------------
 app = Flask('')
 
 @app.route('/')
 def main():
     return "Status: Online(Deployed at {utc_time})".format(utc_time = datetime.now(dt.UTC).strftime(datetime_date_format))
+
+@app.route('/leaderboard/<counter_type>')
+def leaderboard_page(counter_type) :
+    global BOT_READY, DB_READY
+    
+    if not (BOT_READY and DB_READY) :
+        return 'Bot is currently either starting up or undergoing some internal issues, so the leaderboard data is unavailable right now.'
+    
+    if counter_type not in ['bump', 'slap', 'levels'] :
+        return 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'
+    
+    data = fetch_counter_data(counter_type)
+    leaderboard_str = '<ol type = "1">'
+    for data_key in sorted(data, key = data.get, reverse = True) :
+        leaderboard_str += f'<li><h2>{data_key}:<h2><br> <i>{data[data_key]} points</i></li><hr width = "15%" align = "left">'
+        continue
+    leaderboard_str += '</ol>'
+    
+    return f'<h1>{escape(counter_type.upper())} LEADERBOARDS</h1><hr><br>{leaderboard_str}'
 
 def run() :
     PORT = 49152
@@ -132,6 +161,8 @@ database_config = {
 
 firebase_client = pyrebase.initialize_app(database_config) # Intializes the firebase client object.
 firebase_db_obj = firebase_client.database() # Initializes the firebase database object.
+
+DB_READY = True
 #---------------------------------
 
 intents = discord.Intents.all()
@@ -185,6 +216,8 @@ async def bot_updatation() :
 
 @bot.event
 async def on_ready() :
+    global BOT_OWNER_ID, BOT_READY, BOT_START_TIME
+    
     bot_activity = discord.Game(name = 'Getting Slapped by the slappers!', start = bot.user.created_at)
     await bot.change_presence(activity = bot_activity)
     
@@ -198,13 +231,18 @@ async def on_ready() :
     except :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
     
-    bot_updatation.start()
+    if ENVIRONMENT_TYPE == 'PROD' :
+        bot_updatation.start()
+    
+    BOT_READY = True
+    BOT_START_TIME = datetime.now(dt.UTC).strftime(datetime_date_format)
     return
 
 @bot.event
 async def on_resume() :
-    if not bot_updatation.is_running() :
+    if not bot_updatation.is_running() and ENVIRONMENT_TYPE == 'PROD' :
         bot_updatation.start()
+    BOT_START_TIME = datetime.now(dt.UTC).strftime(datetime_date_format)
     return
 
 # ---------------------------------------------------------------------------------
