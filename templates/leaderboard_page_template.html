@@ -1,0 +1,49 @@
+<html style = "height: 100%;">
+
+<head>
+<title>{{ counter_type }} LeaderBoard</title>
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+>
+<style>
+:root {
+--bulma-text-strong: #2F333D;
+--bulma-text: #404654;
+}
+</style>
+</head>
+
+<body style = "background-color: #00A2E8;min-height: 100%;">
+
+<section name = "title_section" class = "hero is-warning block">
+<center>
+<div name = "title_body" class = "hero-body">
+<p class = "title has-text-white">{{ counter_type }} Leaderboard</p>
+</div>
+</center>
+</section>
+
+<section name = "list_section" class = "box block is-centered" style = "min-height: 80%; margin-left: 15%; margin-right: 15%; background-color: rgba(255, 185, 36, 0.7)">
+<div>
+<ul>
+{% for entry in data %}
+<li class = "box block is-centered" style = "width: 90%; margin-left: 5%; margin-right: 5%; background-color: white;">
+<p class = "title is-4 is-black">
+{{ entry['rank'] }}. {{ entry['username'] }}
+</p>
+
+<p class = "subtitle is-6 is-black">
+{{ entry['count'] }} points
+</p>
+</li>
+{% endfor %}
+</ul>
+</div>
+</section>
+
+<br>
+
+</body>
+
+</html>

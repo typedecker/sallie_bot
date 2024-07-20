@@ -15,7 +15,7 @@ nest_asyncio.apply()
 import discord, pyrebase, os, asyncio, flask
 from discord.ext import tasks
 from gtts import gTTS
-from flask import Flask
+from flask import Flask, render_template
 from datetime import datetime
 from threading import Thread
 from yt_dlp import YoutubeDL
@@ -104,7 +104,9 @@ app = Flask('')
 
 @app.route('/')
 def main():
-    return "Status: Online(Deployed at {utc_time})".format(utc_time = datetime.now(dt.UTC).strftime(datetime_date_format))
+    global BOT_START_TIME
+    
+    return "Status: Online(Deployed at {utc_time})".format(utc_time = BOT_START_TIME)
 
 @app.route('/leaderboard/<counter_type>')
 def leaderboard_page(counter_type) :
@@ -116,14 +118,14 @@ def leaderboard_page(counter_type) :
     if counter_type not in ['bump', 'slap', 'levels'] :
         return 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'
     
-    data = fetch_counter_data(counter_type)
-    leaderboard_str = '<ol type = "1">'
-    for data_key in sorted(data, key = data.get, reverse = True) :
-        leaderboard_str += f'<li><h2>{data_key}:<h2><br> <i>{data[data_key]} points</i></li><hr width = "15%" align = "left">'
+    raw_data = fetch_counter_data(counter_type)
+    data = []
+    rank = 1
+    for data_key in sorted(raw_data, key = raw_data.get, reverse = True) :
+        data.append({'rank': rank, 'username': data_key, 'count': raw_data[data_key]})
+        rank += 1
         continue
-    leaderboard_str += '</ol>'
-    
-    return f'<h1>{escape(counter_type.upper())} LEADERBOARDS</h1><hr><br>{leaderboard_str}'
+    return render_template('leaderboard_page_template.html', counter_type = counter_type.title(), data = data)
 
 def run() :
     PORT = 49152
