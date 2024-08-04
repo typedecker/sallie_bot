@@ -1,0 +1,343 @@
+{% if theme == 'dark' %}
+<html class = "theme-dark">
+{% else %}
+<html class = "theme-light">
+{% endif %}
+
+<head>
+	<link
+	  rel="stylesheet"
+	  href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+	>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+	<title>OTP Verification - Slapping Salamanders</title>
+	<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='sallie_cartoon_img.png') }}">
+	<style>
+	:root {
+		--ss-light-blue-1: #4EC8E9;
+		--ss-light-blue-2: #00B5E2;
+		--ss-light-blue-3: #2FACCF;
+		
+		--ss-light-orange-1: #EC944D;
+		--ss-light-orange-2: #F0822E;
+		--ss-light-orange-3: #DA863E;
+		
+		--ss-dark-blue-1: #004B60;
+		--ss-dark-blue-2: #05647F;
+		--ss-dark-blue-3: #106D87;
+		
+		--ss-dark-orange-1: #913F00;
+		--ss-dark-orange-2: #AA4900;
+		--ss-dark-orange-3: #BB5400;
+		
+		{% if theme == 'dark' %}
+		--ss-blue-1: var(--ss-dark-blue-1);
+		--ss-blue-2: var(--ss-dark-blue-2);
+		--ss-blue-3: var(--ss-dark-blue-3);
+		
+		--ss-orange-1: var(--ss-dark-orange-1);
+		--ss-orange-2: var(--ss-dark-orange-2);
+		--ss-orange-3: var(--ss-dark-orange-3);
+		
+		--ss-theme: dark;
+		{% else %}
+		--ss-blue-1: var(--ss-light-blue-1);
+		--ss-blue-2: var(--ss-light-blue-2);
+		--ss-blue-3: var(--ss-light-blue-3);
+		
+		--ss-orange-1: var(--ss-light-orange-1);
+		--ss-orange-2: var(--ss-light-orange-2);
+		--ss-orange-3: var(--ss-light-orange-3);
+		
+		--ss-theme: light;
+		{% endif %}
+	}
+	
+	.table td, .table th {
+		border: none;
+	}
+	</style>
+	<script>
+	
+	var r = document.querySelector(':root');
+	
+	function getCSSVar(varName) {
+		var rs = getComputedStyle(r);
+		return rs.getPropertyValue(varName);
+	}
+	
+	function getTheme() {
+		return getCSSVar('--ss-theme');
+	}
+	
+	function setThemeCookie() {
+		var currTheme = getTheme();
+		
+		fetch('./cookies/theme', {
+			method: 'POST',
+			body: currTheme
+		}).then(response => {
+			// Handle the response
+		   if (!response.ok) {
+			   throw new Error('Network response was not ok');
+		   }
+		   return response.json(); // Parse the response as JSON
+		}).then(data => {
+			console.log(data);
+			console.log("theme set");
+		});
+	}
+	
+	function changeTheme() {
+		var currTheme = getTheme();
+		var rs = getComputedStyle(r);
+		
+		if (currTheme === "light") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-dark-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-dark-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-dark-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-dark-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-dark-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-dark-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'dark');
+		}
+		else if (currTheme === "dark") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-light-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-light-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-light-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-light-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-light-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-light-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'light');
+		}
+		
+		setThemeCookie();
+		return;
+	}
+	
+	function syncBulmaTheme() {
+		var currTheme = getTheme();
+		var rootHtmlElem = document.documentElement;
+		
+		if (currTheme === "dark") {
+			if (rootHtmlElem.classList.contains('theme-light')) {
+				rootHtmlElem.classList.remove('theme-light');
+				rootHtmlElem.classList.add('theme-dark');
+			}
+		}
+		else if (currTheme === "light") {
+			if (rootHtmlElem.classList.contains('theme-dark')) {
+				rootHtmlElem.classList.add('theme-light');
+				rootHtmlElem.classList.remove('theme-dark');
+			}
+		}
+	}
+	
+	syncBulmaTheme();
+	</script>
+</head>
+
+<body>
+
+<div class = "hero is-small" style = "background-color: var(--ss-blue-1);">
+	<div class = "hero head">
+		<nav class = "navbar">
+			<div class = "container">
+				<div class="navbar-brand">
+				  <a class="navbar-item">
+					<img src = "{{ url_for('static', filename='server_pfp.png') }}" alt = "Logo" class = "image" />
+				  </a>
+				  <span id = "navBurger" role = "button" class="navbar-burger" data-target="navbarMenu">
+					<span></span>
+					<span></span>
+					<span></span>
+					<span></span>
+				  </span>
+				</div>
+				
+				<div id = "navbarMenu" class = "navbar-menu">
+					<div class = "navbar-start">
+						<br/>
+					</div>
+					
+					<div class = "navbar-end">
+						<span class = "navbar-item">
+							<span class = "button" style = "background-color: var(--ss-orange-1);" id = "modeToggle">
+								<span class = "icon">
+									<i class = "fas fa-moon" id = "modeIcon"></i>
+								</span>
+							</span>
+						</span>
+					</div>
+				</div>
+			</div>
+		</nav>
+	</div>
+	
+	<div class = "hero-body">
+		<div class = "container has-text-centered">
+			<p class = "title" style = "color: white;"> OTP Verification Page </p>
+		</div>
+	</div>
+	
+	<div class = "hero-foot">
+	</div>
+</div>
+
+<script>
+//script for mobile phone users to toggle the nav menu when they click on the navbar burger.
+const navBurger = document.getElementById('navBurger');
+const navMenu = document.getElementById(navBurger.dataset.target);
+
+navBurger.addEventListener('click', () => {
+	navBurger.classList.toggle('is-active');
+	navMenu.classList.toggle('is-active');
+});
+
+// Script for mode toggle button. Needs to be placed here because it cannot be placed above where the mode toggle has been defined.
+const modeToggle = document.getElementById('modeToggle');
+const modeIcon = document.getElementById('modeIcon');
+
+function updateToggleIcon() {
+	const currTheme = getTheme();
+	
+	if (currTheme === "light") {
+		modeIcon.classList.remove('fa-sun');
+		modeIcon.classList.add('fa-moon');
+	}
+	else if (currTheme === "dark") {
+		modeIcon.classList.remove('fa-moon');
+		modeIcon.classList.add('fa-sun');
+	}
+	return;
+}
+
+modeToggle.addEventListener('click', () => {
+	changeTheme();
+	syncBulmaTheme();
+	updateToggleIcon();
+});
+
+updateToggleIcon();
+</script>
+
+<div style = "background-color: var(--ss-orange-1);">
+
+<section class = "section is-medium">
+
+<center>
+<div class = "column is-three-fifths">
+<div class = "container has-text-left">
+	<div class = "box" style = "background-color: var(--ss-orange-2);">
+		<div class = "container p-5">
+			<ul style = "list-style-type: disc;">
+				<li class = "has-text-left">
+					<p class = "subtitle is-6">
+					To finish the registration process, the bot must have DMed you a secret key, a one time password i.e. an OTP, if you havent gotten DMed yet, please wait for a while, if you still do not get a DM contact the server admin and staff for help with the same.
+					</p>
+				</li>
+				
+				<li class = "has-text-left">
+					<p class = "subtitle is-6">
+					Once you get a DM, you must copy paste the OTP(One Time Password) into the input field given below, and press submit, the website will run a check to verify you, after which your account will be registered successfully!
+					</p>
+				</li>
+			</ul>
+		</div>
+		
+		<br/>
+		
+		<center>
+		<div class = "column is-two-thirds">
+		<div class = "container has-text-left">
+			<div class = "field">
+				<label class = "label">One Time Password(OTP)/Secret Key:</label>
+				<div class = "control has-icons-left">
+					<input id = "otp_inp_field" class = "input" type = "text" placeholder = "OTP">
+					<span class = "icon is-large is-left">
+						<i class = "fas fa-lock"></i>
+					</span>
+				</div>
+				<p class = "help"></p>
+			</div>
+			
+			<br/>
+			
+			<center>
+			<div class = "field">
+				<div class = "control">
+					<button id = "otp_inp_button" class = "button" style = "background-color: var(--ss-blue-2); color: white;">Submit</button>
+				</div>
+			</div>
+			</center>
+		</div>
+		</div>
+		</center>
+	</div>
+</div>
+</div>
+</center>
+
+</section>
+
+<script>
+// Script/Code for the verification of the OTP using a HTTP Post request.
+otp_inp_field = document.getElementById('otp_inp_field');
+otp_inp_button = document.getElementById('otp_inp_button');
+
+otp_inp_button.addEventListener('click', () => {
+	fetch('./verify/{{ discord_id }}', {
+		method: 'POST',
+		body: otp_inp_field.value
+	}).then(response => {
+		// Handle the response
+		if (!response.ok) {
+			throw new Error('Network response was not ok');
+		}
+		return response.json(); // Parse the response as JSON
+	}).then(data => {
+		console.log(data);
+		
+		if (data['status'] === 'success') {
+			alert('Your account has been registered successfully!');
+			window.location.href = "{{ url_for('ss_landing_home_page') }}";
+		}
+		else if (data['status'] === 'failure') {
+			alert('Login unsuccessful!' + data['error']);
+		}
+	});
+});
+</script>
+
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+
+</div>
+
+<footer class = "footer" style = "background-color: var(--ss-blue-1);">
+	<div class = "content has-text-centered">
+		© Copyright 2024. All rights reserved. <strong>Sallie</strong> & The <strong>Slapping Salamanders</strong> discord server have been made by and are owned by typedecker. Any attempt to copy the work without permission shall be dealt with strictly.
+	</div>
+</footer>
+</div>
+
+</body>
+</html>

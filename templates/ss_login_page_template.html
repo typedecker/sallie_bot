@@ -1,0 +1,436 @@
+{% if theme == 'dark' %}
+<html class = "theme-dark">
+{% else %}
+<html class = "theme-light">
+{% endif %}
+
+<head>
+	<link
+	  rel="stylesheet"
+	  href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+	>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+	<title>Login - Slapping Salamanders</title>
+	<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='sallie_cartoon_img.png') }}">
+	<style>
+	:root {
+		--ss-light-blue-1: #4EC8E9;
+		--ss-light-blue-2: #00B5E2;
+		--ss-light-blue-3: #2FACCF;
+		
+		--ss-light-orange-1: #EC944D;
+		--ss-light-orange-2: #F0822E;
+		--ss-light-orange-3: #DA863E;
+		
+		--ss-dark-blue-1: #004B60;
+		--ss-dark-blue-2: #05647F;
+		--ss-dark-blue-3: #106D87;
+		
+		--ss-dark-orange-1: #913F00;
+		--ss-dark-orange-2: #AA4900;
+		--ss-dark-orange-3: #BB5400;
+		
+		{% if theme == 'dark' %}
+		--ss-blue-1: var(--ss-dark-blue-1);
+		--ss-blue-2: var(--ss-dark-blue-2);
+		--ss-blue-3: var(--ss-dark-blue-3);
+		
+		--ss-orange-1: var(--ss-dark-orange-1);
+		--ss-orange-2: var(--ss-dark-orange-2);
+		--ss-orange-3: var(--ss-dark-orange-3);
+		
+		--ss-theme: dark;
+		{% else %}
+		--ss-blue-1: var(--ss-light-blue-1);
+		--ss-blue-2: var(--ss-light-blue-2);
+		--ss-blue-3: var(--ss-light-blue-3);
+		
+		--ss-orange-1: var(--ss-light-orange-1);
+		--ss-orange-2: var(--ss-light-orange-2);
+		--ss-orange-3: var(--ss-light-orange-3);
+		
+		--ss-theme: light;
+		{% endif %}
+	}
+	
+	.table td, .table th {
+		border: none;
+	}
+	</style>
+	<script>
+	
+	var r = document.querySelector(':root');
+	
+	function getCSSVar(varName) {
+		var rs = getComputedStyle(r);
+		return rs.getPropertyValue(varName);
+	}
+	
+	function getTheme() {
+		return getCSSVar('--ss-theme');
+	}
+	
+	function setThemeCookie() {
+		var currTheme = getTheme();
+		
+		fetch('./cookies/theme', {
+			method: 'POST',
+			body: currTheme
+		}).then(response => {
+			// Handle the response
+		   if (!response.ok) {
+			   throw new Error('Network response was not ok');
+		   }
+		   return response.json(); // Parse the response as JSON
+		}).then(data => {
+			console.log(data);
+			console.log("theme set");
+		});
+	}
+	
+	function changeTheme() {
+		var currTheme = getTheme();
+		var rs = getComputedStyle(r);
+		
+		if (currTheme === "light") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-dark-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-dark-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-dark-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-dark-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-dark-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-dark-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'dark');
+		}
+		else if (currTheme === "dark") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-light-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-light-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-light-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-light-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-light-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-light-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'light');
+		}
+		
+		setThemeCookie();
+		return;
+	}
+	
+	function syncBulmaTheme() {
+		var currTheme = getTheme();
+		var rootHtmlElem = document.documentElement;
+		
+		if (currTheme === "dark") {
+			if (rootHtmlElem.classList.contains('theme-light')) {
+				rootHtmlElem.classList.remove('theme-light');
+				rootHtmlElem.classList.add('theme-dark');
+			}
+		}
+		else if (currTheme === "light") {
+			if (rootHtmlElem.classList.contains('theme-dark')) {
+				rootHtmlElem.classList.add('theme-light');
+				rootHtmlElem.classList.remove('theme-dark');
+			}
+		}
+	}
+	
+	syncBulmaTheme();
+	</script>
+</head>
+
+<body>
+
+<div class = "hero is-small" style = "background-color: var(--ss-blue-1);">
+	<div class = "hero head">
+		<nav class = "navbar">
+			<div class = "container">
+				<div class="navbar-brand">
+				  <a class="navbar-item" href = "./home">
+					<img src = "{{ url_for('static', filename='server_pfp.png') }}" alt = "Logo" class = "image" />
+				  </a>
+				  <span id = "navBurger" role = "button" class="navbar-burger" data-target="navbarMenu">
+					<span></span>
+					<span></span>
+					<span></span>
+					<span></span>
+				  </span>
+				</div>
+				
+				<div id = "navbarMenu" class = "navbar-menu">
+					<div class = "navbar-start">
+						<br/>
+						<a class = "navbar-item" href = "./home"> Home </a>
+						<a class = "navbar-item" href = "./info"> Info </a>
+						<a class = "navbar-item" href = "./rules"> Rules </a>
+						<a class = "navbar-item" href = "./sallie_status"> Sallie Bot Status </a>
+						<a class = "navbar-item" href = "./leaderboard"> Leaderboards </a>
+					</div>
+					
+					<div class = "navbar-end">
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./login">Login</a></span>
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./register">Register</a></span>
+						<span class = "navbar-item">
+							<span class = "button" style = "background-color: var(--ss-orange-1);" id = "modeToggle">
+								<span class = "icon">
+									<i class = "fas fa-moon" id = "modeIcon"></i>
+								</span>
+							</span>
+						</span>
+					</div>
+				</div>
+			</div>
+		</nav>
+	</div>
+	
+	<div class = "hero-body">
+		<div class = "container has-text-centered">
+			<br/>
+			<p class = "title" style = "color: white;"> Login </p>
+		</div>
+	</div>
+	
+	<div class = "hero-foot">
+	</div>
+</div>
+
+<script>
+//script for mobile phone users to toggle the nav menu when they click on the navbar burger.
+const navBurger = document.getElementById('navBurger');
+const navMenu = document.getElementById(navBurger.dataset.target);
+
+navBurger.addEventListener('click', () => {
+	navBurger.classList.toggle('is-active');
+	navMenu.classList.toggle('is-active');
+});
+
+// Script for mode toggle button. Needs to be placed here because it cannot be placed above where the mode toggle has been defined.
+const modeToggle = document.getElementById('modeToggle');
+const modeIcon = document.getElementById('modeIcon');
+
+function updateToggleIcon() {
+	const currTheme = getTheme();
+	
+	if (currTheme === "light") {
+		modeIcon.classList.remove('fa-sun');
+		modeIcon.classList.add('fa-moon');
+	}
+	else if (currTheme === "dark") {
+		modeIcon.classList.remove('fa-moon');
+		modeIcon.classList.add('fa-sun');
+	}
+	return;
+}
+
+modeToggle.addEventListener('click', () => {
+	changeTheme();
+	syncBulmaTheme();
+	updateToggleIcon();
+});
+
+updateToggleIcon();
+</script>
+
+<div style = "background-color: var(--ss-orange-1);">
+
+<section class = "section is-medium">
+
+<center>
+<nav class = "level">
+	<div class = "column is-two-fifths">
+	<div class = "level-item has-text-left">
+		<div class = "box" style = "background-color: var(--ss-orange-2);">
+			<div class = "container p-3">
+				<p class = "title is-5 has-text-centered is-underlined">Login using Username</p>
+				<br/>
+				<ul style = "list-style-type: disc;">
+					<li class = "has-text-left">
+						To login using your username you must have registered yourself in the past, if you haven't then please do so instead. If you're registered though, to login with your username, you must type in the username and password associated with your account(the ones with which you registered). After that, press the Login button, if your account is in the server, you'll be DMed a secret key/OTP(One Time Password) that you'd be asked for in the page that opens up, after you type the OTP in and submit, you'll be logged into your account on the website!
+					</li>
+				</ul>
+			</div>
+			
+			<br/>
+			
+			<center>
+			<div class = "column is-two-thirds">
+			<div class = "container has-text-left">
+				<div class = "field">
+					<label class = "label">Username:</label>
+					<div class = "control has-icons-left">
+						<input id = "username_inp_field" class = "input" type = "text" placeholder = "Username">
+						<span class = "icon is-large is-left">
+							<i class = "fas fa-user"></i>
+						</span>
+					</div>
+					<p id = "username_inp_hint" class = "help"></p>
+				</div>
+				
+				<div class = "field">
+					<label class = "label">Password:</label>
+					<div class = "control has-icons-left">
+						<input id = "password_inp_field" class = "input" type = "password" placeholder = "Password">
+						<span class = "icon is-large is-left">
+							<i class = "fas fa-key"></i>
+						</span>
+					</div>
+					<p id = "password_inp_hint" class = "help"></p>
+				</div>
+				
+				<center>
+				<div class = "field">
+					<div class = "control">
+						<button id = "username_login_btn" class = "button" style = "background-color: var(--ss-blue-2); color: white;">Login</button>
+					</div>
+				</div>
+				</center>
+			</div>
+			</div>
+			</center>
+		</div>
+	</div>
+	</div>
+	
+	<div class = "column is-two-fifths">
+	<div class = "level-item has-text-left">
+		<div class = "box" style = "background-color: var(--ss-orange-2);">
+			<div class = "container p-3">
+				<p class = "title is-5 has-text-centered is-underlined">Login using Discord ID</p>
+				<br/>
+				<ul style = "list-style-type: disc;">
+					<li class = "has-text-left">
+						To login using your Discord ID, you need not have registered yourself in the past, any server member can login without registration using this method. To login, you must type in the Discord ID of the discord account you're joined in the server with, to get the ID you can run sallie's <code>$$my_discord_id</code> command! Once you know your ID and type it in the designated area, you must press the Login button right under it,  if your account is in the server, you'll be DMed a secret key/OTP(One Time Password) that you'd be asked for in the page that opens up, after you type the OTP in and submit, you'll be logged into your account on the website!
+					</li>
+				</ul>
+			</div>
+			
+			<br/>
+			
+			<center>
+			<div class = "column is-two-thirds">
+			<div class = "container has-text-left">
+				<div class = "field">
+					<label class = "label">Discord ID:</label>
+					<div class = "control has-icons-left">
+						<input id = "discord_id_login_input" class = "input" type = "text" placeholder = "Discord ID">
+						<span class = "icon is-large is-left">
+							<i class = "fab fa-discord"></i>
+						</span>
+					</div>
+					<p class = "help"></p>
+				</div>
+				
+				<br/>
+				
+				<center>
+				<div class = "field">
+					<div class = "control">
+						<button id = "discord_id_login_button" class = "button" style = "background-color: var(--ss-blue-2); color: white;">Login</button>
+					</div>
+				</div>
+				</center>
+			</div>
+			</div>
+			</center>
+		</div>
+	</div>
+	</div>
+</nav>
+</center>
+
+</section>
+
+<script>
+// Code for the username based Login
+username_inp_field = document.getElementById("username_inp_field");
+password_inp_field = document.getElementById("password_inp_field");
+
+username_inp_hint = document.getElementById("username_inp_hint");
+password_inp_hint = document.getElementById("password_inp_hint");
+
+username_login_btn = document.getElementById("username_login_btn");
+
+username_login_btn.addEventListener('click', () => {
+	fetch("{{ url_for('login_username_verification') }}", {
+		'method': 'POST',
+		'headers': {
+			'Content-Type': 'application/json'
+		},
+		'body': JSON.stringify({
+			'username': username_inp_field.value,
+			'password': password_inp_field.value
+		})
+	}).then(response => {
+		if (!response.ok) {
+			console.log('Well man im sorry to break it to ya, but the response aint ok');
+		}
+		console.log(response);
+		alert(response);
+		return response.json();
+	}).then(data => {
+		if (data['status'] === 'success') {
+			alert("Verified successfully! Redirecting to the OTP Page, You'll recieve an OTP in your discord DMs very shortly!");
+			
+			window.location.href = "./login/username/" + username_inp_field.value.toString();
+		}
+		else if (data['status'] === 'failure') {
+			if (!username_inp_field.classList.contains('is-danger') && data['error'] === 'Account with that username does not exist.') {
+				username_inp_field.classList.add('is-danger');
+				username_inp_hint.innerHTML = data['error'];
+			}
+			else {
+				username_inp_field.classList.remove('is-danger');
+				username_inp_hint.innerHTML = '';
+			}
+			
+			if (!password_inp_field.classList.contains('is-danger') && data['error'] == 'Invalid password!') {
+				password_inp_field.classList.add('is-danger');
+				password_inp_hint.innerHTML = data['error'];
+			}
+			else {
+				password_inp_field.classList.remove('is-danger');
+				password_inp_hint.innerHTML = '';
+			}
+			
+			alert("Login Verification failed before OTP generation could be initiated! Please check your username & password and try again! If you feel like this is an error on the website's end, please contact admin or staff!");
+		}
+	});
+});
+
+// Code for the discord ID Login
+discord_id_inp_field = document.getElementById('discord_id_login_input');
+discord_id_login_button = document.getElementById('discord_id_login_button');
+
+discord_id_login_button.addEventListener('click', () => {
+	discord_id = discord_id_inp_field.value;
+	
+	console.log(discord_id);
+	
+	window.location.href = "./login/otp/" + discord_id.toString();
+});
+</script>
+
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+
+</div>
+
+<footer class = "footer" style = "background-color: var(--ss-blue-1);">
+	<div class = "content has-text-centered">
+		© Copyright 2024. All rights reserved. <strong>Sallie</strong> & The <strong>Slapping Salamanders</strong> discord server have been made by and are owned by typedecker. Any attempt to copy the work without permission shall be dealt with strictly.
+	</div>
+</footer>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,606 @@
+{% if theme == 'dark' %}
+<html class = "theme-dark">
+{% else %}
+<html class = "theme-light">
+{% endif %}
+
+<head>
+	<link
+	  rel="stylesheet"
+	  href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+	>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+	<title>Info - Slapping Salamanders</title>
+	<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='sallie_cartoon_img.png') }}">
+	<style>
+	:root {
+		--ss-light-blue-1: #4EC8E9;
+		--ss-light-blue-2: #00B5E2;
+		--ss-light-blue-3: #2FACCF;
+		
+		--ss-light-orange-1: #EC944D;
+		--ss-light-orange-2: #F0822E;
+		--ss-light-orange-3: #DA863E;
+		
+		--ss-dark-blue-1: #004B60;
+		--ss-dark-blue-2: #05647F;
+		--ss-dark-blue-3: #106D87;
+		
+		--ss-dark-orange-1: #913F00;
+		--ss-dark-orange-2: #AA4900;
+		--ss-dark-orange-3: #BB5400;
+		
+		{% if theme == 'dark' %}
+		--ss-blue-1: var(--ss-dark-blue-1);
+		--ss-blue-2: var(--ss-dark-blue-2);
+		--ss-blue-3: var(--ss-dark-blue-3);
+		
+		--ss-orange-1: var(--ss-dark-orange-1);
+		--ss-orange-2: var(--ss-dark-orange-2);
+		--ss-orange-3: var(--ss-dark-orange-3);
+		
+		--ss-theme: dark;
+		{% else %}
+		--ss-blue-1: var(--ss-light-blue-1);
+		--ss-blue-2: var(--ss-light-blue-2);
+		--ss-blue-3: var(--ss-light-blue-3);
+		
+		--ss-orange-1: var(--ss-light-orange-1);
+		--ss-orange-2: var(--ss-light-orange-2);
+		--ss-orange-3: var(--ss-light-orange-3);
+		
+		--ss-theme: light;
+		{% endif %}
+	}
+	
+	.table td {
+		border: none;
+	}
+	</style>
+	<script>
+	
+	var r = document.querySelector(':root');
+	
+	function getCSSVar(varName) {
+		var rs = getComputedStyle(r);
+		return rs.getPropertyValue(varName);
+	}
+	
+	function getTheme() {
+		return getCSSVar('--ss-theme');
+	}
+	
+	function setThemeCookie() {
+		var currTheme = getTheme();
+		
+		fetch('./cookies/theme', {
+			method: 'POST',
+			body: currTheme
+		}).then(response => {
+			// Handle the response
+		   if (!response.ok) {
+			   throw new Error('Network response was not ok');
+		   }
+		   return response.json(); // Parse the response as JSON
+		}).then(data => {
+			console.log(data);
+			console.log("theme set");
+		});
+	}
+	
+	function changeTheme() {
+		var currTheme = getTheme();
+		var rs = getComputedStyle(r);
+		
+		if (currTheme === "light") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-dark-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-dark-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-dark-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-dark-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-dark-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-dark-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'dark');
+		}
+		else if (currTheme === "dark") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-light-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-light-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-light-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-light-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-light-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-light-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'light');
+		}
+		
+		setThemeCookie();
+		return;
+	}
+	
+	function syncBulmaTheme() {
+		var currTheme = getTheme();
+		var rootHtmlElem = document.documentElement;
+		
+		if (currTheme === "dark") {
+			if (rootHtmlElem.classList.contains('theme-light')) {
+				rootHtmlElem.classList.remove('theme-light');
+				rootHtmlElem.classList.add('theme-dark');
+			}
+		}
+		else if (currTheme === "light") {
+			if (rootHtmlElem.classList.contains('theme-dark')) {
+				rootHtmlElem.classList.add('theme-light');
+				rootHtmlElem.classList.remove('theme-dark');
+			}
+		}
+	}
+	
+	syncBulmaTheme();
+	</script>
+</head>
+
+<body>
+
+<div class = "hero is-medium" style = "background-color: var(--ss-blue-1);">
+	<div class = "hero head">
+		<nav class = "navbar">
+			<div class = "container">
+				<div class="navbar-brand">
+				  <a class="navbar-item" href = "./home">
+					<img src = "{{ url_for('static', filename='server_pfp.png') }}" alt = "Logo" class = "image" />
+				  </a>
+				  <span id = "navBurger" role = "button" class="navbar-burger" data-target="navbarMenu">
+					<span></span>
+					<span></span>
+					<span></span>
+					<span></span>
+				  </span>
+				</div>
+				
+				<div id = "navbarMenu" class = "navbar-menu">
+					<div class = "navbar-start">
+						<br/>
+						<a class = "navbar-item" href = "./home"> Home </a>
+						<a class = "navbar-item" href = "./info"> Info </a>
+						<a class = "navbar-item" href = "./rules"> Rules </a>
+						<a class = "navbar-item" href = "./sallie_status"> Sallie Bot Status </a>
+						<a class = "navbar-item" href = "./leaderboard"> Leaderboards </a>
+					</div>
+					
+					<div class = "navbar-end">
+						{% if login_info['logged_in?'] == 'no' %}
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./login">Login</a></span>
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./register">Register</a></span>
+						{% endif %}
+						<span class = "navbar-item">
+							<span class = "button" style = "background-color: var(--ss-orange-1);" id = "modeToggle">
+								<span class = "icon">
+									<i class = "fas fa-moon" id = "modeIcon"></i>
+								</span>
+							</span>
+						</span>
+						{% if login_info['logged_in?'] == 'yes' %}
+						<div class="navbar-item has-dropdown is-hoverable">
+						<a class="navbar-link">
+							<figure class="image is-32x32 m-3">
+								<img class="is-rounded" src="{{ login_info['avatar'] }}">
+							</figure>
+							<span>{{ login_info['username'] }}</span>
+						</a>
+
+						<div class="navbar-dropdown is-right">
+							<a class="navbar-item">
+								Profile
+							</a>
+							<hr class="navbar-divider">
+							<a id = "logout_button" class="navbar-item">
+								Logout
+							</a>
+						</div>
+						{% endif %}
+					</div>
+				</div>
+			</div>
+		</nav>
+	</div>
+	
+	<div class = "hero-body">
+		<div class = "container">
+			<p class = "title" style = "color: white;"> Info </p>
+			<br/>
+			<br/>
+			<p class = "subtitle" style = "color: white;"> This page contains information about the server, the website and other products related to the both of them. </p>
+		</div>
+	</div>
+	
+	<div class = "hero-foot">
+	</div>
+</div>
+
+<script>
+{% if login_info['logged_in?'] == 'yes' %}
+//script for logging out
+logout_button = document.getElementById('logout_button');
+logout_button.addEventListener('click', () => {
+	fetch('{{ url_for("logout") }}', {
+		method: 'POST',
+		body: 'initiate_logout'
+	}).then(response => {
+		// Handle the response
+		if (!response.ok) {
+			throw new Error('Network response was not ok');
+		}
+		return response.json(); // Parse the response as JSON
+	}).then(data => {
+		console.log(data);
+		if (data['status'] === "success") {
+			alert('You have been logged out successfully!');
+			window.location.reload();
+		}
+		else if (data['status'] === "failure") {
+			alert('Could not log you out successfully! Please try again!');
+		}
+	});
+});
+{% endif %}
+//script for mobile phone users to toggle the nav menu when they click on the navbar burger.
+const navBurger = document.getElementById('navBurger');
+const navMenu = document.getElementById(navBurger.dataset.target);
+
+navBurger.addEventListener('click', () => {
+	navBurger.classList.toggle('is-active');
+	navMenu.classList.toggle('is-active');
+});
+
+// Script for mode toggle button. Needs to be placed here because it cannot be placed above where the mode toggle has been defined.
+const modeToggle = document.getElementById('modeToggle');
+const modeIcon = document.getElementById('modeIcon');
+
+function updateToggleIcon() {
+	const currTheme = getTheme();
+	
+	if (currTheme === "light") {
+		modeIcon.classList.remove('fa-sun');
+		modeIcon.classList.add('fa-moon');
+	}
+	else if (currTheme === "dark") {
+		modeIcon.classList.remove('fa-moon');
+		modeIcon.classList.add('fa-sun');
+	}
+	return;
+}
+
+modeToggle.addEventListener('click', () => {
+	changeTheme();
+	syncBulmaTheme();
+	updateToggleIcon();
+});
+
+updateToggleIcon();
+</script>
+
+<div style = "background-color: var(--ss-orange-1);">
+
+<section class = "section is-small">
+	<article class = "message is-warning">
+		<div class = "message-header">
+			<p> Note </p>
+		</div>
+		<div class = "message-body">
+			Note that this page and it's content are subject to change and may entirely or partially change!!!
+		</div>
+	</article>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Server Flyer</p>
+			<button id = "flyerDropdown">
+				<span class = "icon">
+					<i class = "fas fa-angle-down" id = "flyerDropdownIcon"></i>
+				</span>
+			</button>
+		</div>
+		<div id = "flyerBody" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<p class = "block"> We invite you to the Slapping Salamanders! We are a very friendly, active and talkative community, looking for new friends everyday! </p>
+			
+			<div class = "container">
+			<ul style = "list-style-type: circle;">			
+				<li class = "block"> You can talk about whatever you like, as long as its not against the rules! </li>
+				<li class = "block"> We are very accepting! and no one is left out in the conversations. </li>
+				<li class = "block"> Gamers are welcome to join us and collaborate together too! </li>
+				<li class = "block"> A very simplistic server design to prevent confusion! </li>
+				<li class = "block"> All suggestions and criticism is welcome! </li>
+			</ul>
+			</div>
+			
+		</div>
+	</article>
+</section>
+
+<script>
+//script for flyer dropdown icon, this has to be placed under the section containing the flyer.
+const flyerDropdown = document.getElementById('flyerDropdown');
+const flyerDropdownIcon = document.getElementById('flyerDropdownIcon');
+const flyerBody = document.getElementById('flyerBody');
+
+flyerDropdown.addEventListener('click', () => {
+	if (flyerDropdownIcon.classList.contains('fa-angle-down') && (!flyerBody.classList.contains('is-hidden'))) {
+		flyerBody.classList.add('is-hidden');
+		flyerDropdownIcon.classList.remove('fa-angle-down');
+		flyerDropdownIcon.classList.add('fa-angle-up');
+	}
+	else if (flyerDropdownIcon.classList.contains('fa-angle-up') && flyerBody.classList.contains('is-hidden')) {
+		flyerBody.classList.remove('is-hidden');
+		flyerDropdownIcon.classList.remove('fa-angle-up');
+		flyerDropdownIcon.classList.add('fa-angle-down');
+	}
+});
+</script>
+
+<br/>
+
+<section class = "section is-small">
+	<div class = "container">
+		<p class = "title"> Credits: </p>
+		
+		<br/>
+		
+		<div>
+			<ul style = "list-style-type: disc;">
+				<li>
+					<span>
+						<p class = "heading">Server PFP - </p>
+						<span class = "tag is-dark">@typedecker</span>
+					</span>
+				</li>
+				<li>
+					<span>
+						<p class = "heading">Sallie Bot - </p>
+						<span class = "tag is-dark">@typedecker</span>
+					</span>
+				</li>
+				<li>
+					<span>
+						<p class = "heading">Server Website - </p>
+							<nav class = "level">
+								<div class = "level-left">
+									<span class = "tag is-dark level-item">@typedecker</span>
+								</div>
+							</nav>
+					</span>
+				</li>
+			</ul>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-medium">
+	<div class = "box" style = "background-color: var(--ss-orange-2);">
+		<div class = "container">
+			<p class = "title">Roles</p>
+			
+			<div>
+			<ul style = "list-style-type: disc;">
+				<li>
+					<span>
+						<nav class = "level">
+							<div class = "level-left">
+								<span class = "tag level-item" style = "background-color: var(--ss-blue-3); color: white;"> @Owners </span>
+								<p class = "subtitle level-item">: The Owners of the server. </p>
+							</div>
+						</nav>
+					</span>
+				</li>
+				<li>
+					<span>
+						<nav class = "level">
+							<div class = "level-left">
+								<span class = "tag level-item" style = "background-color: var(--ss-blue-3); color: white;"> @Senior Mods </span>
+								<p class = "subtitle level-item">:  Senior Moderators of the server. </p>
+							</div>
+						</nav>
+					</span>
+				</li>
+				<li>
+					<span>
+						<nav class = "level">
+							<div class = "level-left">
+								<span class = "tag level-item" style = "background-color: var(--ss-blue-3); color: white;"> @Junior Mods </span>
+								<p class = "subtitle level-item">:  Junior Moderators of the server. </p>
+							</div>
+						</nav>
+					</span>
+				</li>
+				<li>
+					<span>
+						<nav class = "level">
+							<div class = "level-left">
+								<span class = "tag level-item" style = "background-color: var(--ss-blue-3); color: white;"> @Slappers </span>
+								<p class = "subtitle level-item"> :  Special role given based on owner's choice.[no specific criteria but talking alot/being active matters alot for this] </p>
+							</div>
+						</nav>
+					</span>
+				</li>
+				<li>
+					<span>
+						<nav class = "level">
+							<div class = "level-left">
+								<span class = "tag level-item" style = "background-color: var(--ss-blue-3); color: white;"> @Salamanders </span>
+								<p class = "subtitle level-item"> :  The general role wielded by anyone and everyone in the server who can view channels! </p>
+							</div>
+						</nav>
+					</span>
+				</li>
+				<li>
+					<span>
+						<nav class = "level">
+							<div class = "level-left">
+								<span class = "tag level-item" style = "background-color: var(--ss-blue-3); color: white;"> @Bots </span>
+								<p class = "subtitle level-item"> :  General role for all bots. </p>
+							</div>
+						</nav>
+					</span>
+				</li>
+			</ul>
+			</div>
+		</div>
+		<br/>
+		<div class = "container">
+			<p class = "title"> Color Roles </p>
+			
+			<div>
+			<table class = "table" style = "background-color: rgba(0, 0, 0, 0); border-collapse: collapse;">
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: black;">@Black</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #7c7c7c;">@Grey</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: white;">@White</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #b30000;">@Dark red</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #b93838;">@Rose</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #bd7070;">@Mona</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff0000;">@Red</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff4f4f;">@Vermilion</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff9999;">@Tangerine</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff6100;">@Orange</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff914a;">@Mango Tango</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ffbd93;">@Koromiko</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ffff00;">@Yellow</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ffff4b;">@Lemon Yellow</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ffff9e;">@Pale Canary</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #a2ff00;">@Lime</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #beff4d;">@Green Yellow</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #dcffa1;">@Reef</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #1eff00;">@Green</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #70ff5d;">@Screamin' Green</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #acffa0;">@Mint Green</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #00ff7a;">@Spring Green</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #55ffaa;">@Aquamarine</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #a9ffd5;">@Aero</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #00ffcd;">@Bright Turquoise</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #56ffee;">@Aqua</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #adfff6;">@Fresh Air</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #00d4ff;">@Cyan</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #57e1ff;">@Malibu</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #a9f1ff;">@Clear water</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #0090ff;">@Azure Radiance</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #57b4ff;">@Blueberry</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #9fd5ff;">@Anakiwa</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #004cff;">@Blue Ribbon</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #7d98ff;">@Indigo</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #b8c9ff;">@Melrose</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #0f00ff;">@Blue</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #6f66ff;">@Royal Blue</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #bda9ff;">@Ship Cove</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #6900ff;">@Electric Violet</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #9f5eff;">@Heliotrope</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #cdacff;">@Mauve</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #be00ff;">@Violet</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #d860ff;">@Amethyst</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #efb8ff;">@East Side</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff00f3;">@Magenta</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff60f8;">@Pink Flamingo</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ffaafa;">@Lavender Rose</span></td>
+				</tr>
+				<tr>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff00a9;">@Hollywood Cerise</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ff69cc;">@Hot Pink</span></td>
+					<td><span class = "tag level-item mr-6" style = "background-color: #ffb8e7;">@Cotton Candy</span></td>
+				</tr>
+			</table>
+			</div>
+		</div>
+		
+		<br/>
+		
+		<div class = "container">
+			<article class = "message is-warning">
+				<div class = "message-header">
+					<p> Note about promotion roles </p>
+				</div>
+				<div class = "message-body">
+					<br/>
+					<ol>
+						<li>Talking really actively and regularly will grant you the <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">@Slappers</span> role!</li>
+						<br/>
+						<li><span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">@Junior Mods</span> is the Junior Moderator role and a member can apply for the same via <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white; border-radius: 0px;">#junior-mod-applications</span> channel in the server!</li>
+					</ol>
+					<br/>
+				</div>
+			</article>
+		</div>
+		<br/>
+		<br/>
+		<div class = "container">
+			<article class = "message is-warning">
+				<div class = "message-header">
+					<p> Note about color roles </p>
+				</div>
+				<div class = "message-body">
+					<br/>
+					<ol>
+						<li>Every new member will be <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: #ff6100; color: white;">@Orange</span> by default but they can set a custom color if they want.</li>
+						<br/>
+						<li>Not changing color would mean following the server's color theme, and if the member is ever promoted their color will be changed accordingly 💖.</li>
+					</ol>
+					<br/>
+				</div>
+			</article>
+		</div>
+	</div>
+</section>
+
+<!-- Make a section for server survey ratings, once the survey page and it's code has been done. --->
+
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+
+</div>
+
+<footer class = "footer" style = "background-color: var(--ss-blue-1);">
+	<div class = "content has-text-centered">
+		© Copyright 2024. All rights reserved. <strong>Sallie</strong> & The <strong>Slapping Salamanders</strong> discord server have been made by and are owned by typedecker. Any attempt to copy the work without permission shall be dealt with strictly.
+	</div>
+</footer>
+</div>
+
+</body>
+</html>

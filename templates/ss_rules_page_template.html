@@ -1,0 +1,1373 @@
+{% if theme == 'dark' %}
+<html class = "theme-dark">
+{% else %}
+<html class = "theme-light">
+{% endif %}
+
+<head>
+	<link
+	  rel="stylesheet"
+	  href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+	>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+	<title>Rules - Slapping Salamanders</title>
+	<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='sallie_cartoon_img.png') }}">
+	<style>
+	:root {
+		--ss-light-blue-1: #4EC8E9;
+		--ss-light-blue-2: #00B5E2;
+		--ss-light-blue-3: #2FACCF;
+		
+		--ss-light-orange-1: #EC944D;
+		--ss-light-orange-2: #F0822E;
+		--ss-light-orange-3: #DA863E;
+		
+		--ss-dark-blue-1: #004B60;
+		--ss-dark-blue-2: #05647F;
+		--ss-dark-blue-3: #106D87;
+		
+		--ss-dark-orange-1: #913F00;
+		--ss-dark-orange-2: #AA4900;
+		--ss-dark-orange-3: #BB5400;
+		
+		{% if theme == 'dark' %}
+		--ss-blue-1: var(--ss-dark-blue-1);
+		--ss-blue-2: var(--ss-dark-blue-2);
+		--ss-blue-3: var(--ss-dark-blue-3);
+		
+		--ss-orange-1: var(--ss-dark-orange-1);
+		--ss-orange-2: var(--ss-dark-orange-2);
+		--ss-orange-3: var(--ss-dark-orange-3);
+		
+		--ss-theme: dark;
+		{% else %}
+		--ss-blue-1: var(--ss-light-blue-1);
+		--ss-blue-2: var(--ss-light-blue-2);
+		--ss-blue-3: var(--ss-light-blue-3);
+		
+		--ss-orange-1: var(--ss-light-orange-1);
+		--ss-orange-2: var(--ss-light-orange-2);
+		--ss-orange-3: var(--ss-light-orange-3);
+		
+		--ss-theme: light;
+		{% endif %}
+	}
+	
+	.table td {
+		border: none;
+	}
+	</style>
+	<script>
+	
+	var r = document.querySelector(':root');
+	
+	function getCSSVar(varName) {
+		var rs = getComputedStyle(r);
+		return rs.getPropertyValue(varName);
+	}
+	
+	function getTheme() {
+		return getCSSVar('--ss-theme');
+	}
+	
+	function setThemeCookie() {
+		var currTheme = getTheme();
+		
+		fetch('./cookies/theme', {
+			method: 'POST',
+			body: currTheme
+		}).then(response => {
+			// Handle the response
+		   if (!response.ok) {
+			   throw new Error('Network response was not ok');
+		   }
+		   return response.json(); // Parse the response as JSON
+		}).then(data => {
+			console.log(data);
+			console.log("theme set");
+		});
+	}
+	
+	function changeTheme() {
+		var currTheme = getTheme();
+		var rs = getComputedStyle(r);
+		
+		if (currTheme === "light") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-dark-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-dark-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-dark-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-dark-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-dark-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-dark-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'dark');
+		}
+		else if (currTheme === "dark") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-light-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-light-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-light-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-light-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-light-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-light-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'light');
+		}
+		
+		setThemeCookie();
+		return;
+	}
+	
+	function syncBulmaTheme() {
+		var currTheme = getTheme();
+		var rootHtmlElem = document.documentElement;
+		
+		if (currTheme === "dark") {
+			if (rootHtmlElem.classList.contains('theme-light')) {
+				rootHtmlElem.classList.remove('theme-light');
+				rootHtmlElem.classList.add('theme-dark');
+			}
+		}
+		else if (currTheme === "light") {
+			if (rootHtmlElem.classList.contains('theme-dark')) {
+				rootHtmlElem.classList.add('theme-light');
+				rootHtmlElem.classList.remove('theme-dark');
+			}
+		}
+	}
+	
+	syncBulmaTheme();
+	</script>
+</head>
+
+<body>
+
+<div class = "hero is-medium" style = "background-color: var(--ss-blue-1);">
+	<div class = "hero head">
+		<nav class = "navbar">
+			<div class = "container">
+				<div class="navbar-brand">
+				  <a class="navbar-item" href = "./home">
+					<img src = "{{ url_for('static', filename='server_pfp.png') }}" alt = "Logo" class = "image" />
+				  </a>
+				  <span id = "navBurger" role = "button" class="navbar-burger" data-target="navbarMenu">
+					<span></span>
+					<span></span>
+					<span></span>
+					<span></span>
+				  </span>
+				</div>
+				
+				<div id = "navbarMenu" class = "navbar-menu">
+					<div class = "navbar-start">
+						<br/>
+						<a class = "navbar-item" href = "./home"> Home </a>
+						<a class = "navbar-item" href = "./info"> Info </a>
+						<a class = "navbar-item" href = "./rules"> Rules </a>
+						<a class = "navbar-item" href = "./sallie_status"> Sallie Bot Status </a>
+						<a class = "navbar-item" href = "./leaderboard"> Leaderboards </a>
+					</div>
+					
+					<div class = "navbar-end">
+						{% if login_info['logged_in?'] == 'no' %}
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./login">Login</a></span>
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./register">Register</a></span>
+						{% endif %}
+						<span class = "navbar-item">
+							<span class = "button" style = "background-color: var(--ss-orange-1);" id = "modeToggle">
+								<span class = "icon">
+									<i class = "fas fa-moon" id = "modeIcon"></i>
+								</span>
+							</span>
+						</span>
+						{% if login_info['logged_in?'] == 'yes' %}
+						<div class="navbar-item has-dropdown is-hoverable">
+						<a class="navbar-link">
+							<figure class="image is-32x32 m-3">
+								<img class="is-rounded" src="{{ login_info['avatar'] }}">
+							</figure>
+							<span>{{ login_info['username'] }}</span>
+						</a>
+
+						<div class="navbar-dropdown is-right">
+							<a class="navbar-item">
+								Profile
+							</a>
+							<hr class="navbar-divider">
+							<a id = "logout_button" class="navbar-item">
+								Logout
+							</a>
+						</div>
+						{% endif %}
+					</div>
+				</div>
+			</div>
+		</nav>
+	</div>
+	
+	<div class = "hero-body">
+		<div class = "container">
+			<p class = "title" style = "color: white;"> Rules </p>
+			<br/>
+			<br/>
+			<p class = "subtitle" style = "color: white;"> This page describes and lists all the rules of the server along with, any and all information required to support them. This can be used for reference by moderators or other server members if needed. This can also be used to introduce new members to the rules if required. </p>
+		</div>
+	</div>
+	
+	<div class = "hero-foot">
+	</div>
+</div>
+
+<script>
+{% if login_info['logged_in?'] == 'yes' %}
+//script for logging out
+logout_button = document.getElementById('logout_button');
+logout_button.addEventListener('click', () => {
+	fetch('{{ url_for("logout") }}', {
+		method: 'POST',
+		body: 'initiate_logout'
+	}).then(response => {
+		// Handle the response
+		if (!response.ok) {
+			throw new Error('Network response was not ok');
+		}
+		return response.json(); // Parse the response as JSON
+	}).then(data => {
+		console.log(data);
+		if (data['status'] === "success") {
+			alert('You have been logged out successfully!');
+			window.location.reload();
+		}
+		else if (data['status'] === "failure") {
+			alert('Could not log you out successfully! Please try again!');
+		}
+	});
+});
+{% endif %}
+//script for mobile phone users to toggle the nav menu when they click on the navbar burger.
+const navBurger = document.getElementById('navBurger');
+const navMenu = document.getElementById(navBurger.dataset.target);
+
+navBurger.addEventListener('click', () => {
+	navBurger.classList.toggle('is-active');
+	navMenu.classList.toggle('is-active');
+});
+
+// Script for mode toggle button. Needs to be placed here because it cannot be placed above where the mode toggle has been defined.
+const modeToggle = document.getElementById('modeToggle');
+const modeIcon = document.getElementById('modeIcon');
+
+function updateToggleIcon() {
+	const currTheme = getTheme();
+	
+	if (currTheme === "light") {
+		modeIcon.classList.remove('fa-sun');
+		modeIcon.classList.add('fa-moon');
+	}
+	else if (currTheme === "dark") {
+		modeIcon.classList.remove('fa-moon');
+		modeIcon.classList.add('fa-sun');
+	}
+	return;
+}
+
+modeToggle.addEventListener('click', () => {
+	changeTheme();
+	syncBulmaTheme();
+	updateToggleIcon();
+});
+
+updateToggleIcon();
+</script>
+
+<div style = "background-color: var(--ss-orange-1);">
+
+<section class = "section is-small">
+	<article class = "message is-danger">
+		<div class = "message-header">
+			<p>VERY IMPORTANT RULE</p>
+			<div class = "is-pulled-right">
+				<button id = "rule0Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule0MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule0Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule0DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule0Body" class = "message-body">
+			<p class = "block">
+				Very important rule for all those who didnt already understand this or are possibly inhumane creatures: Do not ignore people a billion times and then make excuses over why people should be ignored, if you cannot talk to more than one person at a time then just do not join servers and use DMs. This server does not tolerate ignorance.
+			</p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule0Modal">
+		<div class = "modal-background" id = "rule0ModalBackground"></div>
+		<div class = "modal-card is-danger" id = "rule0ModalCard">
+			<header id = "rule0ModalCardHeader" class="modal-card-head has-background-danger">
+				<p class="modal-card-title">VERY IMPORTANT RULE</p>
+				<button id = "rule0ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule0ModalCardBody" class="modal-card-body has-background-danger-soft has-text-danger-inverted">
+				 Very important rule for all those who didnt already understand this or are possibly inhumane creatures: Do not ignore people a billion times and then make excuses over why people should be ignored, if you cannot talk to more than one person at a time then just do not join servers and use DMs. This server does not tolerate ignorance.
+			</section>
+			<footer id = "rule0ModalCardFooter" class="modal-card-foot has-background-danger" style = "padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule0ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 1</p>
+			<div class = "is-pulled-right">
+				<button id = "rule1Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule1MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule1Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule1DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule1Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<p class = "block"> Talking about anything is allowed as long as it doesn't disrespect anyone. </p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule1Modal">
+		<div class = "modal-background" id = "rule1ModalBackground"></div>
+		<div class = "modal-card" id = "rule1ModalCard">
+			<header id = "rule1ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 1</p>
+				<button id = "rule1ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule1ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				 Talking about anything is allowed as long as it doesn't disrespect anyone.
+			</section>
+			<footer id = "rule1ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule1ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 2</p>
+			<div class = "is-pulled-right">
+				<button id = "rule2Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule2MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule2Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule2DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule2Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<p class = "block"> Spamming is allowed, as long as its for short time intervals and isnt an attempt to raid the server. [If asked by the owner to stop, it must not be continued] </p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule2Modal">
+		<div class = "modal-background" id = "rule2ModalBackground"></div>
+		<div class = "modal-card" id = "rule2ModalCard">
+			<header id = "rule2ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 2</p>
+				<button id = "rule2ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule2ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				 Spamming is allowed, as long as its for short time intervals and isnt an attempt to raid the server. [If asked by the owner to stop, it must not be continued]
+			</section>
+			<footer id = "rule2ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule2ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 3</p>
+			<div class = "is-pulled-right">
+				<button id = "rule3Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule3MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule3Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule3DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule3Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<p class = "block"> The final decision of whether or not someone is breaking the rules lies in the hands of <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-orange-3); color: white;"> @Owners </span>  and <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-orange-3); color: white;"> @Senior Mods </span>  themselves. </p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule3Modal">
+		<div class = "modal-background" id = "rule3ModalBackground"></div>
+		<div class = "modal-card" id = "rule3ModalCard">
+			<header id = "rule3ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 3</p>
+				<button id = "rule3ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule3ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				 The final decision of whether or not someone is breaking the rules lies in the hands of <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-orange-3); color: white;"> @Owners </span>  and <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-orange-3); color: white;"> @Senior Mods </span>  themselves.
+			</section>
+			<footer id = "rule3ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule3ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 4</p>
+			<div class = "is-pulled-right">
+				<button id = "rule4Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule4MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule4Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule4DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule4Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<p class = "block">
+				You must have a love-hate relationship with salamanders and slap them on a regular basis /J
+			</p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule4Modal">
+		<div class = "modal-background" id = "rule4ModalBackground"></div>
+		<div class = "modal-card" id = "rule4ModalCard">
+			<header id = "rule4ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 4</p>
+				<button id = "rule4ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule4ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				 You must have a love-hate relationship with salamanders and slap them on a regular basis /J
+			</section>
+			<footer id = "rule4ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule4ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 5</p>
+			<div class = "is-pulled-right">
+				<button id = "rule5Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule5MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule5Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule5DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule5Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<div class = "container">
+				<p class = "block">
+					Tone indicators would be appreciated to prevent misunderstanding[Look under the rules message].
+				</p>
+				
+				<br/>
+				
+				<div class = "box" style = "background-color: var(--ss-orange-2);">
+					<p class = "title is-5"> Tone Indicators </p>
+					
+					<br/>
+					
+					<div class = "table-container">
+						<table class = "table" style = "background-color: rgba(0, 0, 0, 0); border-collapse: collapse;">
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/j
+									</span>
+								</td>
+								<td>
+									: joking
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/l
+									</span>
+									or
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/ly
+									</span>
+								</td>
+								<td>
+									: lyrics
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/hyp
+									</span>
+								</td>
+								<td>
+									: hyperbole
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/hj
+									</span>
+								</td>
+								<td>
+									: half joking
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/t
+									</span>
+								</td>
+								<td>
+									: teasing
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/c
+									</span>
+								</td>
+								<td>
+									: copypasta
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/srs
+									</span>
+								</td>
+								<td>
+									: serious
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/nm
+									</span>
+								</td>
+								<td>
+									: not actually mad or upset
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/sx
+									</span>
+									or
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/x
+									</span>
+								</td>
+								<td>
+									: sexual intent
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/s
+									</span>
+								</td>
+								<td>
+									: sarcastic
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/nc
+									</span>
+									or
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/neg
+									</span>
+								</td>
+								<td>
+									: negative connotation
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/nsx
+									</span>
+									or
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/nx
+									</span>
+								</td>
+								<td>
+									: non-sexual intent
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/lh
+									</span>
+								</td>
+								<td>
+									: lighthearted
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/pc
+									</span>
+									or
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/pos
+									</span>
+								</td>
+								<td>
+									: positive connotation
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/th
+									</span>
+								</td>
+								<td>
+									: threat
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/nm
+									</span>
+								</td>
+								<td>
+									: not mad
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/ij
+									</span>
+								</td>
+								<td>
+									: inside joke
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/cb
+									</span>
+								</td>
+								<td>
+									: clickbait
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/gen
+									</span>
+								</td>
+								<td>
+									: genuinely
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/nbh
+									</span>
+								</td>
+								<td>
+									: nobody here (for when you are vauging someone in a vent)
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/f
+									</span>
+								</td>
+								<td>
+									: fake
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/li
+									</span>
+								</td>
+								<td>
+									: literally
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/m
+									</span>
+								</td>
+								<td>
+									: metaphorically
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/g
+									</span>
+								</td>
+								<td>
+									: genuine
+								</td>
+							</tr>
+							<tr>
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/rh
+									</span>
+									or
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/rt
+									</span>
+								</td>
+								<td>
+									: rhetorical question
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/p
+									</span>
+								</td>
+								<td>
+									: platonic
+								</td>
+								
+								<td>
+									<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+										/r
+									</span>
+								</td>
+								<td>
+									: romantic
+								</td>
+							</tr>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	</article>
+	<div class = "modal" id = "rule5Modal">
+		<div class = "modal-background" id = "rule5ModalBackground"></div>
+		<div class = "modal-card" id = "rule5ModalCard" style = "min-width: 90%;">
+			<header id = "rule5ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 5</p>
+				<button id = "rule5ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule5ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				<div class = "container">
+					<p class = "block">
+						Tone indicators would be appreciated to prevent misunderstanding[Look under the rules message].
+					</p>
+					
+					<br/>
+					
+					<div class = "box" style = "background-color: var(--ss-orange-2);">
+						<p class = "title is-5"> Tone Indicators </p>
+						
+						<br/>
+						
+						<div class = "table-container">
+							<table class = "table" style = "background-color: rgba(0, 0, 0, 0); border-collapse: collapse;">
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/j
+										</span>
+									</td>
+									<td>
+										: joking
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/l
+										</span>
+										or
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/ly
+										</span>
+									</td>
+									<td>
+										: lyrics
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/hyp
+										</span>
+									</td>
+									<td>
+										: hyperbole
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/hj
+										</span>
+									</td>
+									<td>
+										: half joking
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/t
+										</span>
+									</td>
+									<td>
+										: teasing
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/c
+										</span>
+									</td>
+									<td>
+										: copypasta
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/srs
+										</span>
+									</td>
+									<td>
+										: serious
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/nm
+										</span>
+									</td>
+									<td>
+										: not actually mad or upset
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/sx
+										</span>
+										or
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/x
+										</span>
+									</td>
+									<td>
+										: sexual intent
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/s
+										</span>
+									</td>
+									<td>
+										: sarcastic
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/nc
+										</span>
+										or
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/neg
+										</span>
+									</td>
+									<td>
+										: negative connotation
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/nsx
+										</span>
+										or
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/nx
+										</span>
+									</td>
+									<td>
+										: non-sexual intent
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/lh
+										</span>
+									</td>
+									<td>
+										: lighthearted
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/pc
+										</span>
+										or
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/pos
+										</span>
+									</td>
+									<td>
+										: positive connotation
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/th
+										</span>
+									</td>
+									<td>
+										: threat
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/nm
+										</span>
+									</td>
+									<td>
+										: not mad
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/ij
+										</span>
+									</td>
+									<td>
+										: inside joke
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/cb
+										</span>
+									</td>
+									<td>
+										: clickbait
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/gen
+										</span>
+									</td>
+									<td>
+										: genuinely
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/nbh
+										</span>
+									</td>
+									<td>
+										: nobody here (for when you are vauging someone in a vent)
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/f
+										</span>
+									</td>
+									<td>
+										: fake
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/li
+										</span>
+									</td>
+									<td>
+										: literally
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/m
+										</span>
+									</td>
+									<td>
+										: metaphorically
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/g
+										</span>
+									</td>
+									<td>
+										: genuine
+									</td>
+								</tr>
+								<tr>
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/rh
+										</span>
+										or
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/rt
+										</span>
+									</td>
+									<td>
+										: rhetorical question
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/p
+										</span>
+									</td>
+									<td>
+										: platonic
+									</td>
+									
+									<td>
+										<span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-blue-3); color: white;">
+											/r
+										</span>
+									</td>
+									<td>
+										: romantic
+									</td>
+								</tr>
+							</table>
+						</div>
+					</div>
+				</div>
+			</section>
+			<footer id = "rule5ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule5ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 6</p>
+			<div class = "is-pulled-right">
+				<button id = "rule6Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule6MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule6Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule6DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule6Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<p class = "block">
+				No external server links are allowed unless otherwise permitted by the mods.
+			</p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule6Modal">
+		<div class = "modal-background" id = "rule6ModalBackground"></div>
+		<div class = "modal-card" id = "rule6ModalCard">
+			<header id = "rule6ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 6</p>
+				<button id = "rule6ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule6ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				 No external server links are allowed unless otherwise permitted by the mods.
+			</section>
+			<footer id = "rule6ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule6ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 7</p>
+			<div class = "is-pulled-right">
+				<button id = "rule7Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule7MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule7Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule7DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule7Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<div class = "block">
+				<ul style = "list-style-type: disc;">
+					<li>
+						Do <font style = "color: var(--bulma-danger); font-weight: bold; text-decoration: underline;">NOT</font> invite everyone from this server to your own server, self advertising of any kind including but not limited to (art, onlyfans shit, music, and other shit) isnt allowed and can be reported to us for further action.
+					</li>
+					<br/>
+					<li>
+						No kind of self-promotion without the explicit permission of <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-orange-3); color: white;"> @typedecker </span> is allowed(This includes DMing a server member and inviting them to your server).
+					</li>
+				</ul>
+			</div>
+		</div>
+	</article>
+	<div class = "modal" id = "rule7Modal">
+		<div class = "modal-background" id = "rule7ModalBackground"></div>
+		<div class = "modal-card" id = "rule7ModalCard">
+			<header id = "rule7ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 7</p>
+				<button id = "rule7ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule7ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				<div class = "block">
+					<ul style = "list-style-type: disc;">
+						<li>
+							Do <font style = "color: var(--bulma-danger); font-weight: bold; text-decoration: underline;">NOT</font> invite everyone from this server to your own server, self advertising of any kind including but not limited to (art, onlyfans shit, music, and other shit) isnt allowed and can be reported to us for further action.
+						</li>
+						<br/>
+						<li>
+							No kind of self-promotion without the explicit permission of <span class = "tag is-inline is-medium pr-1 pl-1 pb-1 mr-2" style = "background-color: var(--ss-orange-3); color: white;"> @typedecker </span> is allowed(This includes DMing a server member and inviting them to your server).
+						</li>
+					</ul>
+				</div>
+			</section>
+			<footer id = "rule7ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule7ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message">
+		<div class = "message-header" style = "background-color: var(--ss-blue-3);color: white;">
+			<p>Rule 8</p>
+			<div class = "is-pulled-right">
+				<button id = "rule8Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule8MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule8Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule8DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule8Body" class = "message-body" style = "background-color: var(--ss-blue-1);">
+			<p class = "block">
+				Use of languages other than english are to be limited.
+			</p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule8Modal">
+		<div class = "modal-background" id = "rule8ModalBackground"></div>
+		<div class = "modal-card" id = "rule8ModalCard">
+			<header id = "rule8ModalCardHeader" class="modal-card-head" style = "background-color: var(--ss-blue-3);color: white;">
+				<p class="modal-card-title">Rule 8</p>
+				<button id = "rule8ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule8ModalCardBody" class="modal-card-body" style = "background-color: var(--ss-blue-1);">
+				 Use of languages other than english are to be limited.
+			</section>
+			<footer id = "rule8ModalCardFooter" class="modal-card-foot is-small" style = "background-color: var(--ss-blue-3);color: white;padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule8ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<section class = "section is-small">
+	<article class = "message is-warning">
+		<div class = "message-header">
+			<p>EXTRA RULE</p>
+			<div class = "is-pulled-right">
+				<button id = "rule9Magnify" style = "margin-right: 0;">
+					<span class = "icon">
+						<i class = "fas fa-search" id = "rule9MagnifyIcon"></i>
+					</span>
+				</button>
+				<button id = "rule9Dropdown" style = "margin-left: 0;">
+					<span class = "icon">
+						<i class = "fas fa-angle-down" id = "rule9DropdownIcon"></i>
+					</span>
+				</button>
+			</div>
+		</div>
+		<div id = "rule9Body" class = "message-body">
+			<p class = "block">
+				<font style = "color: var(--bulma-danger); font-weight: bold; text-decoration: underline;">NO</font> gojo pics.
+			</p>
+		</div>
+	</article>
+	<div class = "modal" id = "rule9Modal">
+		<div class = "modal-background" id = "rule9ModalBackground"></div>
+		<div class = "modal-card is-warning" id = "rule9ModalCard">
+			<header id = "rule9ModalCardHeader" class="modal-card-head has-background-warning">
+				<p class="modal-card-title">Rule 9</p>
+				<button id = "rule9ModalCloseButton" class="delete"></button>
+			</header>
+			<section id = "rule9ModalCardBody" class="modal-card-body has-background-warning-soft has-text-warning-inverted">
+				 <font style = "color: var(--bulma-danger); font-weight: bold; text-decoration: underline;">NO</font> gojo pics.
+			</section>
+			<footer id = "rule9ModalCardFooter" class="modal-card-foot has-background-warning" style = "padding-top: 1rem;padding-bottom: 1rem;">
+				<div class="buttons">
+					<button id = "rule9ModalCardCloseButton" class="button" style = "background-color: var(--ss-orange-1);">Close</button>
+				</div>
+			</footer>
+		</div>
+	</div>
+</section>
+
+<script>
+//script for rule dropdown icons, this has to be placed under the sections containing the rules as well.
+const ruleDropdowns = document.querySelectorAll("[id^='rule'][id$='Dropdown']");
+const ruleDropdownIcons = document.querySelectorAll("[id^='rule'][id$='DropdownIcon']");
+const ruleBodies = document.querySelectorAll("[id^='rule'][id$='Body']:not([id$='ModalCardBody'])");
+
+ruleDropdowns.forEach(
+	function(dropdown, index) {
+		dropdown.addEventListener('click', () => {
+			console.log(index, ruleBodies);
+			if (ruleDropdownIcons[index].classList.contains('fa-angle-down') && (!ruleBodies[index].classList.contains('is-hidden'))) {
+				ruleBodies[index].classList.add('is-hidden');
+				ruleDropdownIcons[index].classList.remove('fa-angle-down');
+				ruleDropdownIcons[index].classList.add('fa-angle-up');
+			}
+			else if (ruleDropdownIcons[index].classList.contains('fa-angle-up') && ruleBodies[index].classList.contains('is-hidden')) {
+				ruleBodies[index].classList.remove('is-hidden');
+				ruleDropdownIcons[index].classList.remove('fa-angle-up');
+				ruleDropdownIcons[index].classList.add('fa-angle-down');
+			}
+		});
+	}
+);
+
+//script for rule magnification/modal activation icons, this has to be placed under the sections containing the rules as well.
+const ruleMagnifies = document.querySelectorAll("[id^='rule'][id$='Magnify']");
+const ruleModals = document.querySelectorAll("[id^='rule'][id$='Modal']");
+
+ruleMagnifies.forEach( (magnify, index) => {
+	var ruleModal = ruleModals[index];
+	var query = "[id^='rule" + (index).toString() + "Modal'][id$='CloseButton']";
+	var ruleModalCloseButtons = document.querySelectorAll(query);
+	
+	magnify.addEventListener('click', () => {
+		if (!ruleModal.classList.contains('is-active')) {
+			ruleModal.classList.add('is-active');
+		}
+	});
+	
+	ruleModalCloseButtons.forEach( (button, index) => {
+		button.addEventListener('click', () => {
+			console.log(index);
+			if (ruleModal.classList.contains('is-active')) {
+				ruleModal.classList.remove('is-active');
+			}
+		});
+	});
+});
+</script>
+
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+<br/>
+
+</div>
+
+<footer class = "footer" style = "background-color: var(--ss-blue-1);">
+	<div class = "content has-text-centered">
+		© Copyright 2024. All rights reserved. <strong>Sallie</strong> & The <strong>Slapping Salamanders</strong> discord server have been made by and are owned by typedecker. Any attempt to copy the work without permission shall be dealt with strictly.
+	</div>
+</footer>
+</div>
+
+</body>
+</html>

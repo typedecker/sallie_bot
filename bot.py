@@ -12,10 +12,10 @@ print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 import nest_asyncio
 nest_asyncio.apply()
 
-import discord, pyrebase, os, asyncio, flask
+import discord, pyrebase, os, asyncio, flask, sys, secrets
 from discord.ext import tasks
 from gtts import gTTS
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for, request, make_response, session
 from datetime import datetime
 from threading import Thread
 from yt_dlp import YoutubeDL
@@ -70,6 +70,11 @@ _Task_Class.__del__ = _patched_del
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
 CONFESSION_CHANNEL_ID = 1239309061585899572
+BOOSTER_NOTIF_CHANNEL_ID = 1269368301256179772
+BOOSTER_TIER_ROLE_IDS = {'1': 1269733606432051210,
+                         '2': 1269733728025055334,
+                         '3': 1269733769619701902,
+                         '++': 1269733864637595670,}
 BOT_OWNER_ID = 568446269610000385
 PET_OWNER_GUILD = 1230967641200394302
 
@@ -87,8 +92,10 @@ HELP_DICT = {
             'm_pause': ['$$m_pause', 'Pauses the song.'],
             'm_resume': ['$$m_resume', 'Resumes the song.'],
             'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.'],
-            'lb': ['$$lb <counter-type:slap|bump|levels>', 'Displays the leaderboards for the given counter-type.'],
+            'lb': ['$$lb <counter-type:slap|bump|boost|levels>', 'Displays the leaderboards for the given counter-type.'],
             'revive': ['$$revive @person1 @person2 ...', 'Sends a sweet revival message to whoever is pinged in their DMs.'],
+            'my_discord_id': ['$$my_discord_id', 'Displays the user\'s discord id. Can be used for logging into the website!'],
+            'boost[ADMIN ONLY]': ['$$boost @booster', 'Updates the database to store the pinged member as a booster.[ADMIN ONLY]'],
             }
 
 YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
@@ -97,57 +104,9 @@ FFMPEG_OPTIONS = {'before_options' : '-reconnect 1 -reconnect_streamed 1 -reconn
 # -------
 
 BOT_READY, DB_READY = False, False
-BOT_START_TIME = datetime.now(dt.UTC).strftime(datetime_date_format)
+BOT_START_TIME = datetime.now(dt.UTC) #.strftime(datetime_date_format)
 
-# -------------------------------
-app = Flask('')
-
-@app.route('/')
-def main():
-    global BOT_START_TIME
-    
-    return "Status: Online(Deployed at {utc_time})".format(utc_time = BOT_START_TIME)
-
-@app.route('/leaderboard/<counter_type>')
-def leaderboard_page(counter_type) :
-    global BOT_READY, DB_READY
-    
-    if not (BOT_READY and DB_READY) :
-        return 'Bot is currently either starting up or undergoing some internal issues, so the leaderboard data is unavailable right now.'
-    
-    if counter_type not in ['bump', 'slap', 'levels'] :
-        return 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'
-    
-    raw_data = fetch_counter_data(counter_type)
-    data = []
-    rank = 1
-    for data_key in sorted(raw_data, key = raw_data.get, reverse = True) :
-        data.append({'rank': rank, 'username': data_key, 'count': raw_data[data_key]})
-        rank += 1
-        continue
-    return render_template('leaderboard_page_template.html', counter_type = counter_type.title(), data = data)
-
-def run() :
-    PORT = 49152
-    port_found = False
-    while not port_found :
-        try :
-            app.run(host="0.0.0.0", port = PORT)
-            port_found = True
-            print('Bot is now running on port: {port}'.format(port = PORT))
-        except :
-            print('Port({port}) is already in use, checking a new port...'.format(port = PORT))
-            port_found = False
-            PORT += 1
-        continue
-    return
-
-def keep_alive():
-    server = Thread(target=run)
-    server.start()
-    return
-
-# -------------------------------
+L_OTPs, R_OTPs = {}, {}
 
 #---------DATABASE SETUP----------
 # Initializes the configurations for the firebase realtime database.
@@ -237,14 +196,14 @@ async def on_ready() :
         bot_updatation.start()
     
     BOT_READY = True
-    BOT_START_TIME = datetime.now(dt.UTC).strftime(datetime_date_format)
+    BOT_START_TIME = datetime.now(dt.UTC)
     return
 
 @bot.event
 async def on_resume() :
     if not bot_updatation.is_running() and ENVIRONMENT_TYPE == 'PROD' :
         bot_updatation.start()
-    BOT_START_TIME = datetime.now(dt.UTC).strftime(datetime_date_format)
+    BOT_START_TIME = datetime.now(dt.UTC)
     return
 
 # ---------------------------------------------------------------------------------
@@ -292,7 +251,7 @@ def play_next() :
 def fetch_counter_data(counter_type) :
     global firebase_db_obj
     
-    if counter_type not in ['bump', 'slap', 'levels'] : return {}
+    if counter_type not in ['bump', 'slap', 'levels', 'boost'] : return {}
     data = {}
     
     salaslappers = firebase_db_obj.child(counter_type).get()
@@ -316,9 +275,546 @@ def fetch_counter_leaderboard_str(counter_type) :
 
 # --------------------------------------
 
+# -------------------------------
+app = Flask(__name__)
+app.secret_key = secrets.token_hex(32)
+
+def get_login_info() :
+    is_logged_in = session.get('logged_in?') or 'no'
+    if is_logged_in == 'yes' :
+        return {'logged_in?': is_logged_in, 'discord_id': session['discord_id'], 'username': session['username'], 'avatar': session['avatar']}
+    elif is_logged_in == 'no' :
+        session['logged_in?'] = 'no'
+        return {'logged_in?': 'no'}
+
+@app.route('/')
+def main() :
+    return redirect(url_for('ss_landing_home_page'))
+
+@app.route('/cookies/theme', methods = ['POST', 'GET'])
+def theme_cookies() :
+    if request.method == 'POST' :
+        curr_theme = request.data.decode('utf-8')
+        print(curr_theme)
+        sys.stdout.flush()
+        
+        response = make_response({'theme': curr_theme})
+        response.set_cookie('theme', curr_theme, max_age = 60 * 60 * 24 * 365 * 1)
+        return response
+    return 'Hello ehhehe'
+
+@app.route('/home')
+def ss_landing_home_page() :
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_landing_home_page_template.html', theme = curr_theme, login_info = get_login_info())
+
+@app.route('/info')
+def ss_info_page() :
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_info_page_template.html', theme = curr_theme, login_info = get_login_info())
+
+@app.route('/rules')
+def ss_rules_page() :
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_rules_page_template.html', theme = curr_theme, login_info = get_login_info())
+
+@app.route('/sallie_status')
+def ss_sallie_bot_status_page() :
+    global BOT_START_TIME
+    
+    deploy_time = BOT_START_TIME.strftime('%I:%M:%S %p (%Z Time)')
+    deploy_date = BOT_START_TIME.strftime('%A, %d %b %Y (%Z Time)')
+    curr_theme = request.cookies.get('theme') or 'light'
+    
+    return render_template('ss_sallie_bot_status_page_template.html', time = deploy_time, date = deploy_date, theme = curr_theme, login_info = get_login_info())
+
+@app.route('/leaderboard')
+def ss_leaderboards_main_page() :
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_leaderboards_main_page_template.html', theme = curr_theme, login_info = get_login_info())
+
+@app.route('/leaderboard/<counter_type>')
+def leaderboard_page(counter_type) :
+    global BOT_READY, DB_READY
+    
+    if not (BOT_READY and DB_READY) :
+        if not BOT_READY :
+            return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, so the leaderboard data is unavailable right now.'})
+        elif not DB_READY :
+            return render_template('error_redirect_page_template.html', error = {'title': 'DB Startup Error', 'description': 'The database has either not started up properly or is facing some issues, please try again later.'})
+        # return 'Bot is currently either starting up or undergoing some internal issues, so the leaderboard data is unavailable right now.'
+    
+    if counter_type not in ['bump', 'slap', 'levels'] :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Invalid Leaderboard Error', 'description': 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'})
+        # return 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'
+    
+    raw_data = fetch_counter_data(counter_type)
+    data = []
+    rank = 1
+    for data_key in sorted(raw_data, key = raw_data.get, reverse = True) :
+        data.append({'rank': rank, 'username': data_key, 'count': raw_data[data_key]})
+        rank += 1
+        continue
+    return render_template('leaderboard_page_template.html', counter_type = counter_type.title(), data = data)
+
+@app.route('/login')
+def ss_login_page() :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to login with a new one.'})
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_login_page_template.html', theme = curr_theme, login_info = get_login_info())
+
+@app.route('/login/username/verify', methods = ['POST', 'GET'])
+def login_username_verification() :
+    if session.get('logged_in?') == 'yes' :
+        response = make_response({'status': 'failure', 'error': 'You are already logged into an account, logout before trying to login with a new one.'})
+        return response
+    
+    global BOT_READY, DB_READY, firebase_db_obj
+    
+    if not BOT_READY :
+        response = make_response({'status': 'failure', 'error': 'Bot is currently either starting up or undergoing some internal issues, Username validation is not possible at the moment.'})
+        return response
+    
+    if not DB_READY :
+        response = make_response({'status': 'failure', 'error': 'The database has either not started up properly or is facing some issues, please try again later.'})
+        return response
+    
+    if request.method == 'POST' :
+        typed_info = request.get_json()
+        print(typed_info)
+        sys.stdout.flush()
+        username, password = typed_info['username'], typed_info['password']
+        
+        accounts = firebase_db_obj.child('website').child('accounts').get().val() or {}
+        if str(username) in [str(account) for account in list(accounts.keys())] :
+            account_info = accounts[username]
+            if account_info['password'] == password :
+                response = make_response({'status': 'success'})
+            else :
+                response = make_response({'status': 'failure', 'error': 'Invalid password!'})
+            return response
+        else :
+            response = make_response({'status': 'failure', 'error': 'Account with that username does not exist.'})
+            return response
+    
+    response = make_response({'status': 'failure', 'error': 'Something unexpected has occurred, please contact admin or staff for help with this.'})
+    return response
+
+async def dm_logging_user(discord_id) :
+    global bot, PET_OWNER_GUILD
+    
+    await bot.wait_until_ready()
+    
+    try :
+        logging_user = bot.get_user(discord_id)
+    except :
+        return False, {'title': 'User Not Found Error', 'description': 'The discord ID provided is either invalid or could not be found. Please contact server admin and staff if you think the ID is correct.'}
+    
+    if not any([guild.id == PET_OWNER_GUILD for guild in logging_user.mutual_guilds]) :
+        return False, {'title': 'Not in Server Error', 'description': 'The bot cannot find you in the server and thus the OTP request has been cancelled.'}
+    
+    try :
+        if logging_user.dm_channel == None :
+            await logging_user.create_dm()
+        await logging_user.dm_channel.send(f'The OTP(One Time Password)/Secret Key for you to login to your account is given below: ```{L_OTPs[discord_id]["OTP"]}``` To login you must copy this and paste it on the page as instructed. If you have not tried logging into your account and are seeing this message, contact the server staff immediately as this might be a security issue!')
+        return True, {}
+    except Exception as e :
+        print(e)
+        sys.stdout.flush()
+        return False, {'title': 'DM Error', 'description': 'Could not DM the OTP to the discord account provided.'}
+
+@app.route('/login/username/<string:username>')
+def ss_login_username_otp_page(username) :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to login with a new one.'})
+    global BOT_READY
+    
+    if not BOT_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, OTP generation is not possible at the moment.'})
+    
+    # ----
+    global L_OTPs, bot, PET_OWNER_GUILD
+    
+    accounts = firebase_db_obj.child('website').child('accounts').get().val() or {}
+    account_info = accounts.get(username)
+    if account_info == None :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Invalid Account Info Error', 'description': 'No account with the provided username and password exists, please register first, or use the discord id method to login. If you feel like this is an issue on the website\'s end please contact admin and staff about this for further help. Thanks!'})
+        pass
+    discord_id = account_info['discord_id']
+    
+    L_OTPs[discord_id] = {'OTP': secrets.token_hex(32), 'login_method': 'username', 'username': username, 'discord_id': discord_id} # As per current standards 32 bytes is the amount of bytes worth of data that is safe enough.
+    
+    dm_attempt_task = bot.loop.create_task(dm_logging_user(discord_id))
+    
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_login_otp_page_template.html', theme = curr_theme, discord_id = discord_id)
+
+@app.route('/login/otp/<int:discord_id>')
+def ss_login_otp_page(discord_id) :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to login with a new one.'})
+    global BOT_READY
+    
+    if not BOT_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, OTP generation is not possible at the moment.'})
+    
+    # ----
+    global L_OTPs, bot, PET_OWNER_GUILD
+    
+    L_OTPs[discord_id] = {'OTP': secrets.token_hex(32), 'login_method': 'otp'} # As per current standards 32 bytes is the amount of bytes worth of data that is safe enough.
+    
+    dm_attempt_task = bot.loop.create_task(dm_logging_user(discord_id))
+    
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_login_otp_page_template.html', theme = curr_theme, discord_id = discord_id)
+
+def login_without_username(discord_id) :
+    global L_OTPs, bot
+    
+    discord_user = bot.get_user(discord_id)
+    discord_username = discord_user.name
+    discord_avatar = discord_user.avatar.url if discord_user.avatar else None
+    
+    session['discord_id'] = discord_id
+    session['username'] = discord_username or f'({str(discord_id)})th salamander'
+    session['avatar'] = discord_avatar or url_for('static', filename='default_account_pfp.png')
+    
+    # Uses the username stored in database if the user has registered in the past.
+    accounts = firebase_db_obj.child('website').child('accounts').get().val() or {}
+    stored_usernames = [k for k, v in accounts.items() if v['discord_id'] == session['discord_id']]
+    if any(stored_usernames) : session['username'] = stored_usernames[0]
+    
+    session['logged_in?'] = 'yes'
+    session['login_method'] = 'otp'
+    return
+
+def login_with_username(discord_id, username) :
+    global L_OTPs, bot
+    
+    discord_user = bot.get_user(discord_id)
+    discord_username = username or discord_user.name
+    discord_avatar = discord_user.avatar.url if discord_user.avatar else None
+    
+    session['discord_id'] = discord_id
+    session['username'] = discord_username or f'({str(discord_id)})th salamander'
+    session['avatar'] = discord_avatar or url_for('static', filename='default_account_pfp.png')
+    
+    session['logged_in?'] = 'yes'
+    session['login_method'] = 'username'
+    return
+
+@app.route('/logout', methods = ['POST', 'GET'])
+def logout() :
+    if request.method == 'POST' :
+        session.pop('discord_id')
+        session.pop('username')
+        session.pop('avatar')
+        
+        session['logged_in?'] = 'no'
+        
+        response = make_response({'status': 'success'})
+        return response
+    return render_template('error_redirect_page_template.html', error = {'title': 'Unknown Error', 'description': 'Something unexpected has occurred, please contact admin or staff for help with this.'})
+
+@app.route('/login/otp/verify/<int:discord_id>', methods = ['POST', 'GET'])
+def login_otp_verification(discord_id) :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to login with a new one.'})
+    global BOT_READY
+    
+    if not BOT_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, OTP verification is not possible at the moment.'})
+    
+    # ----
+    global L_OTPs
+    
+    if request.method == 'POST' :
+        typed_otp = request.data.decode('utf-8')
+        print(typed_otp, discord_id, L_OTPs)
+        sys.stdout.flush()
+        
+        if discord_id not in L_OTPs :
+            response = make_response({'status': 'failure', 'error': 'OTP was never generated for this user.'})
+        else :
+            login_info = L_OTPs[discord_id]
+            if typed_otp == login_info['OTP'] :
+                # do the login here by calling a separate function that logs you in.
+                if login_info['login_method'] == 'otp' :
+                    login_without_username(discord_id)
+                elif login_info['login_method'] == 'username' :
+                    login_with_username(discord_id, login_info['username'])
+                response = make_response({'status': 'success'})
+            else :
+                response = make_response({'status': 'failure', 'error': 'Typed OTP is wrong.'})
+        return response
+    return render_template('error_redirect_page_template.html', error = {'title': 'Unknown Error', 'description': 'Something unexpected has occurred, please contact admin or staff for help with this.'})
+
+@app.route('/register')
+def ss_registration_page() :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to register a new one.'})
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_registration_page_template.html', theme = curr_theme)
+
+@app.route('/register/discord_id_validity', methods = ['POST', 'GET'])
+def discord_id_validity_check() :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to register a new one.'})
+    global BOT_READY, DB_READY, firebase_db_obj
+    
+    if not BOT_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, Discord ID validation is not possible at the moment.'})
+    
+    if not DB_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'DB Startup Error', 'description': 'The database has either not started up properly or is facing some issues, please try again later.'})
+    
+    if request.method == 'POST' :
+        try :
+            discord_id = int(request.data.decode('utf-8'))
+        except :
+            response = make_response({'availability': 'unavailable'})
+            return response
+        
+        accounts = firebase_db_obj.child('website').child('accounts').get().val() or {}
+        if any([str(accounts[account]['discord_id']) == str(discord_id) for account in accounts]) :
+            response = make_response({'availability': 'unavailable'})
+            return response
+        else :
+            response = make_response({'availability': 'available'})
+            return response
+    return render_template('error_redirect_page_template.html', error = {'title': 'Unknown Error', 'description': 'Something unexpected has occurred, please contact admin or staff for help with this.'})
+
+@app.route('/register/username_validity', methods = ['POST', 'GET'])
+def username_validity_check() :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to register a new one.'})
+    global BOT_READY, DB_READY, firebase_db_obj
+    
+    if not BOT_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, Username validation is not possible at the moment.'})
+    
+    if not DB_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'DB Startup Error', 'description': 'The database has either not started up properly or is facing some issues, please try again later.'})
+    
+    if request.method == 'POST' :
+        username = request.data.decode('utf-8')
+        
+        accounts = firebase_db_obj.child('website').child('accounts').get().val() or {}
+        if str(username) in [str(account) for account in list(accounts.keys())] :
+            response = make_response({'availability': 'unavailable'})
+            return response
+        else :
+            response = make_response({'availability': 'available'})
+            return response
+    return render_template('error_redirect_page_template.html', error = {'title': 'Unknown Error', 'description': 'Something unexpected has occurred, please contact admin or staff for help with this.'})
+
+async def dm_registering_user(discord_id) :
+    global bot, PET_OWNER_GUILD
+    
+    await bot.wait_until_ready()
+    
+    try :
+        registering_user = bot.get_user(discord_id)
+    except :
+        return False, {'title': 'User Not Found Error', 'description': 'The discord ID provided is either invalid or could not be found. Please contact server admin and staff if you think the ID is correct.'}
+    
+    if not any([guild.id == PET_OWNER_GUILD for guild in registering_user.mutual_guilds]) :
+        return False, {'title': 'Not in Server Error', 'description': 'The bot cannot find you in the server and thus the OTP request has been cancelled.'}
+    
+    try :
+        if registering_user.dm_channel == None :
+            await registering_user.create_dm()
+        await registering_user.dm_channel.send(f'The OTP(One Time Password)/Secret Key for you to register your account is given below: ```{R_OTPs[discord_id]["OTP"]}``` To register your account successfully, you must copy this and paste it on the page as instructed. If you have not tried registering your account and are seeing this message, contact the server staff immediately as this might be a security issue!')
+        return True, {}
+    except Exception as e :
+        print(e)
+        sys.stdout.flush()
+        return False, {'title': 'DM Error', 'description': 'Could not DM the OTP to the discord account provided.'}
+
+@app.route('/register/info_upload', methods = ['POST', 'GET'])
+def registration_info_upload() :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to register a new one.'})
+    global BOT_READY, DB_READY, firebase_db_obj
+    
+    if not BOT_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, OTP generation is not possible at the moment.'})
+    
+    if not DB_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'DB Startup Error', 'description': 'The database has either not started up properly or is facing some issues, please try again later.'})
+    
+    # ----
+    if request.method == 'POST' :
+        global R_OTPs, bot, PET_OWNER_GUILD
+        
+        reg_info = request.get_json()
+        try :
+            discord_id = int(reg_info['discord_id'])
+        except :
+            response = make_response({'status': 'failure', 'error': 'Invalid Discord ID entered.'})
+            return response
+        
+        accounts = firebase_db_obj.child('website').child('accounts').get().val() or {}
+        if any([str(accounts[account]['discord_id']) == str(discord_id) for account in accounts]) :
+            response = make_response({'status': 'failure', 'error': 'An account already exists for the discord account linked to this discord ID.'})
+            return response
+        if str(reg_info['username']) in [str(account) for account in list(accounts.keys())] :
+           response = make_response({'status': 'failure', 'error': 'An account with this username already exists.'})
+           return response
+        
+        R_OTPs[discord_id] = {'OTP': secrets.token_hex(32), 'username': reg_info['username'], 'password': reg_info['password']} # As per current standards 32 bytes is the amount of bytes worth of data that is safe enough.
+        
+        dm_attempt_task = bot.loop.create_task(dm_registering_user(int(discord_id)))
+        response = make_response({'status': 'success'})
+        return response
+    return render_template('error_redirect_page_template.html', error = {'title': 'Unknown Error', 'description': 'Something unexpected has occurred, please contact admin or staff for help with this.'})
+
+@app.route('/register/otp/<int:discord_id>')
+def ss_register_otp_page(discord_id) :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to register a new one.'})
+    curr_theme = request.cookies.get('theme') or 'light'
+    return render_template('ss_registration_otp_page_template.html', theme = curr_theme, discord_id = discord_id)
+
+def register(discord_id) :
+    global R_OTPs, firebase_db_obj
+    
+    reg_info = R_OTPs[discord_id]
+    
+    firebase_db_obj.child('website').child('accounts').child(reg_info['username']).child('discord_id').set(discord_id)
+    firebase_db_obj.child('website').child('accounts').child(reg_info['username']).child('password').set(reg_info['password'])
+    
+    discord_user = bot.get_user(discord_id)
+    discord_username = discord_user.name
+    discord_avatar = discord_user.avatar.url if discord_user.avatar else None
+    
+    session['discord_id'] = discord_id
+    session['username'] = reg_info['username'] or discord_username or f'({str(discord_id)})th salamander'
+    session['avatar'] = discord_avatar or url_for('static', filename='default_account_pfp.png')
+    
+    session['logged_in?'] = 'yes'
+    return
+
+@app.route('/register/otp/verify/<int:discord_id>', methods = ['POST', 'GET'])
+def register_otp_verification(discord_id) :
+    if session.get('logged_in?') == 'yes' :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Already logged In Error', 'description': 'You are already logged into an account, logout before trying to register a new one.'})
+    global BOT_READY, DB_READY
+    
+    if not BOT_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'Bot Startup Error', 'description': 'Bot is currently either starting up or undergoing some internal issues, OTP verification is not possible at the moment.'})
+    
+    if not DB_READY :
+        return render_template('error_redirect_page_template.html', error = {'title': 'DB Startup Error', 'description': 'The database has either not started up properly or is facing some issues, please try again later.'})
+    
+    # ----
+    global R_OTPs
+    
+    if request.method == 'POST' :
+        typed_otp = request.data.decode('utf-8')
+        print(typed_otp, discord_id, R_OTPs)
+        sys.stdout.flush()
+        
+        if discord_id not in R_OTPs :
+            response = make_response({'status': 'failure', 'error': 'OTP was never generated for this discord ID.'})
+        else :
+            if typed_otp == R_OTPs[discord_id]['OTP'] :
+                # do the registration here by calling a separate function that registers you.
+                register(discord_id)
+                response = make_response({'status': 'success'})
+            else :
+                response = make_response({'status': 'failure', 'error': 'Typed OTP is wrong.'})
+        return response
+    return render_template('error_redirect_page_template.html', error = {'title': 'Unknown Error', 'description': 'Something unexpected has occurred, please contact admin or staff for help with this.'})
+
+def run() :
+    PORT = 49152
+    port_found = False
+    while not port_found :
+        try :
+            app.run(host="0.0.0.0", port = PORT)
+            port_found = True
+            print('Bot is now running on port: {port}'.format(port = PORT))
+        except :
+            print('Port({port}) is already in use, checking a new port...'.format(port = PORT))
+            port_found = False
+            PORT += 1
+        continue
+    return
+
+def keep_alive():
+    server = Thread(target=run)
+    server.start()
+    return
+
+# -------------------------------
+
+async def on_boost(booster) :
+    # Notify about it to people on the server.
+    boost_notif_channel = bot.get_channel(BOOSTER_NOTIF_CHANNEL_ID)
+    if boost_notif_channel == None :
+        boost_notif_channel = await bot.fetch_channel(BOOSTER_NOTIF_CHANNEL_ID)
+    
+    boost_notif_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), 
+                                      title = f'♡ __{booster.name} just boosted the server!__',
+                                      description = 'Thanks so much for boosting our server yay!!')
+    boost_notif_embed.set_thumbnail(url = 'https://media.discordapp.net/attachments/1230975895213441034/1269723474923094110/images.png?ex=66b119a2&is=66afc822&hm=e154d18c3935830b2d57343bba2642561d1b43705ab2b341cb538579da1ac2ae&=&format=webp&quality=lossless&width=450&height=252')
+    await boost_notif_channel.send(embed = boost_notif_embed)
+    
+    name = firebase_db_obj.child('boost').child(booster.id).child('username').get().val()
+    count = firebase_db_obj.child('boost').child(booster.id).child('count').get().val() or 0
+    tier = firebase_db_obj.child('boost').child(booster.id).child('tier').get().val() or '0'
+    
+    print(name, count, tier)
+    
+    prev_tier = tier
+    
+    count += 1
+    if tier != '++' :
+        if int(tier) < 3 :
+            tier = str(int(tier) + 1)
+        else :
+            tier = '++'
+    else :
+        tier = '++'
+    
+    # Changing up roles
+    guild = bot.get_guild(PET_OWNER_GUILD)
+    if guild == None :
+        guild = await bot.fetch_guild(PET_OWNER_GUILD)
+    if prev_tier != '0' :
+        old_tier_role = guild.get_role(BOOSTER_TIER_ROLE_IDS[prev_tier])
+        await booster.remove_roles(old_tier_role)
+    
+    new_tier_role = guild.get_role(BOOSTER_TIER_ROLE_IDS[tier])
+    await booster.add_roles(new_tier_role)
+    
+    if prev_tier != '++' :
+        boost_tier_notif_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), 
+                                               title = f'♡ __{booster.name} just got a Tier Upgrade!!__',
+                                               description = f'Congrats! Your new boost tier is Tier {tier}!')
+        boost_tier_notif_embed.set_thumbnail(url = 'https://media.discordapp.net/attachments/1230975895213441034/1269723474923094110/images.png?ex=66b119a2&is=66afc822&hm=e154d18c3935830b2d57343bba2642561d1b43705ab2b341cb538579da1ac2ae&=&format=webp&quality=lossless&width=450&height=252')
+        await boost_notif_channel.send(embed = boost_tier_notif_embed)
+    
+    firebase_db_obj.child('boost').child(str(booster.id)).child('username').set(booster.name)
+    firebase_db_obj.child('boost').child(str(booster.id)).child('count').set(count)
+    firebase_db_obj.child('boost').child(str(booster.id)).child('tier').set(tier)
+    return
+
+def get_boost_gain(old_value, member) :
+    name = firebase_db_obj.child('boost').child(member.id).child('username').get().val()
+    count = firebase_db_obj.child('boost').child(member.id).child('count').get().val() or 0
+    tier = firebase_db_obj.child('boost').child(member.id).child('tier').get().val() or '0'
+    
+    # if tier == '++' : tier = ((count - 4) * 0.1) + 4
+    if tier == '++' : tier = 4
+    
+    return (old_value * int(tier))
+
 @bot.event
 async def on_message(message) :
-    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
@@ -334,6 +830,13 @@ async def on_message(message) :
             
             firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('username').set(message.interaction_metadata.user.name)
             firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('count').set(count + 1)
+        return
+    
+    if message.type == discord.MessageType.premium_guild_subscription :
+        # Its a boost notif.
+        booster = message.author
+        
+        await on_boost(booster)
         return
         
     if message.content.lower() == '$$ping' :
@@ -362,9 +865,10 @@ async def on_message(message) :
         count = firebase_db_obj.child('slap').child(message.author.id).child('count').get().val() or 0
         
         print(name, count)
+        count += get_boost_gain(1, message.author)
         
         firebase_db_obj.child('slap').child(str(message.author.id)).child('username').set(message.author.name)
-        firebase_db_obj.child('slap').child(str(message.author.id)).child('count').set(count + 1)
+        firebase_db_obj.child('slap').child(str(message.author.id)).child('count').set(count)
         return
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
@@ -503,6 +1007,14 @@ async def on_message(message) :
             await message.channel.send('Revival message sent to {revivals}!'.format(revivals = ', '.join(list_of_revivals)))
         else :
             await message.channel.send('You cannot revive yourself silly! You are already alive!! Grrrr')
+    if message.content.lower() == '$$my_discord_id' :
+        await message.channel.send(f'Your discord ID is: ```{message.author.id}```')
+    if message.author.id == BOT_OWNER_ID and message.content.lower().startswith('$$boost ') :
+        booster = message.mentions[0]
+        
+        await on_boost(booster)
+        await message.channel.send('Noted master adi! I have modified my databases as per ur wishes hehe!!')
+        return
 
     return
 

@@ -1,0 +1,348 @@
+{% if theme == 'dark' %}
+<html class = "theme-dark">
+{% else %}
+<html class = "theme-light">
+{% endif %}
+
+<head>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+	<link
+	  rel="stylesheet"
+	  href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+	>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+	<title>Home - Slapping Salamanders</title>
+	<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='sallie_cartoon_img.png') }}">
+	<style>
+	:root {
+		--ss-light-blue-1: #4EC8E9;
+		--ss-light-blue-2: #00B5E2;
+		--ss-light-blue-3: #2FACCF;
+		
+		--ss-light-orange-1: #EC944D;
+		--ss-light-orange-2: #F0822E;
+		--ss-light-orange-3: #DA863E;
+		
+		--ss-dark-blue-1: #004B60;
+		--ss-dark-blue-2: #05647F;
+		--ss-dark-blue-3: #106D87;
+		
+		--ss-dark-orange-1: #913F00;
+		--ss-dark-orange-2: #AA4900;
+		--ss-dark-orange-3: #BB5400;
+		
+		{% if theme == 'dark' %}
+		--ss-blue-1: var(--ss-dark-blue-1);
+		--ss-blue-2: var(--ss-dark-blue-2);
+		--ss-blue-3: var(--ss-dark-blue-3);
+		
+		--ss-orange-1: var(--ss-dark-orange-1);
+		--ss-orange-2: var(--ss-dark-orange-2);
+		--ss-orange-3: var(--ss-dark-orange-3);
+		
+		--ss-theme: dark;
+		{% else %}
+		--ss-blue-1: var(--ss-light-blue-1);
+		--ss-blue-2: var(--ss-light-blue-2);
+		--ss-blue-3: var(--ss-light-blue-3);
+		
+		--ss-orange-1: var(--ss-light-orange-1);
+		--ss-orange-2: var(--ss-light-orange-2);
+		--ss-orange-3: var(--ss-light-orange-3);
+		
+		--ss-theme: light;
+		{% endif %}
+	}
+	</style>
+	<script>
+	
+	var r = document.querySelector(':root');
+	
+	function getCSSVar(varName) {
+		var rs = getComputedStyle(r);
+		return rs.getPropertyValue(varName);
+	}
+	
+	function getTheme() {
+		return getCSSVar('--ss-theme');
+	}
+	
+	function setThemeCookie() {
+		var currTheme = getTheme();
+		
+		fetch('./cookies/theme', {
+			method: 'POST',
+			body: currTheme
+		}).then(response => {
+			// Handle the response
+		   if (!response.ok) {
+			   throw new Error('Network response was not ok');
+		   }
+		   return response.json(); // Parse the response as JSON
+		}).then(data => {
+			console.log(data);
+			console.log("theme set");
+		});
+	}
+	
+	function changeTheme() {
+		var currTheme = getTheme();
+		var rs = getComputedStyle(r);
+		
+		if (currTheme === "light") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-dark-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-dark-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-dark-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-dark-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-dark-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-dark-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'dark');
+		}
+		else if (currTheme === "dark") {
+			r.style.setProperty('--ss-blue-1', getCSSVar('--ss-light-blue-1'));
+			r.style.setProperty('--ss-blue-2', getCSSVar('--ss-light-blue-2'));
+			r.style.setProperty('--ss-blue-3', getCSSVar('--ss-light-blue-3'));
+			
+			r.style.setProperty('--ss-orange-1', getCSSVar('--ss-light-orange-1'));
+			r.style.setProperty('--ss-orange-2', getCSSVar('--ss-light-orange-2'));
+			r.style.setProperty('--ss-orange-3', getCSSVar('--ss-light-orange-3'));
+			
+			r.style.setProperty('--ss-theme', 'light');
+		}
+		
+		setThemeCookie();
+		return;
+	}
+	
+	function syncBulmaTheme() {
+		var currTheme = getTheme();
+		var rootHtmlElem = document.documentElement;
+		
+		if (currTheme === "dark") {
+			if (rootHtmlElem.classList.contains('theme-light')) {
+				rootHtmlElem.classList.remove('theme-light');
+				rootHtmlElem.classList.add('theme-dark');
+			}
+		}
+		else if (currTheme === "light") {
+			if (rootHtmlElem.classList.contains('theme-dark')) {
+				rootHtmlElem.classList.add('theme-light');
+				rootHtmlElem.classList.remove('theme-dark');
+			}
+		}
+	}
+	
+	syncBulmaTheme();
+	</script>
+</head>
+
+<body>
+
+<div class = "hero is-large" style = "background-color: var(--ss-blue-1);">
+	<div class = "hero head">
+		<nav class = "navbar">
+			<div class = "container">
+				<div class="navbar-brand">
+				  <a class="navbar-item" href = "./home">
+					<img src = "{{ url_for('static', filename='server_pfp.png') }}" alt = "Logo" class = "image" />
+				  </a>
+				  <span id = "navBurger" role = "button" class="navbar-burger" data-target="navbarMenu">
+					<span></span>
+					<span></span>
+					<span></span>
+					<span></span>
+				  </span>
+				</div>
+				
+				<div id = "navbarMenu" class = "navbar-menu has-text-grey-darker">
+					<div class = "navbar-start">
+						<br/>
+						<a class = "navbar-item" href = "./home"> Home </a>
+						<a class = "navbar-item" href = "./info"> Info </a>
+						<a class = "navbar-item" href = "./rules"> Rules </a>
+						<a class = "navbar-item" href = "./sallie_status"> Sallie Bot Status </a>
+						<a class = "navbar-item" href = "./leaderboard"> Leaderboards </a>
+					</div>
+					
+					<div class = "navbar-end">
+						{% if login_info['logged_in?'] == 'no' %}
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./login">Login</a></span>
+						<span class = "navbar-item"><a class = "button" style = "background-color: var(--ss-orange-1);" href = "./register">Register</a></span>
+						{% endif %}
+						<span class = "navbar-item">
+							<span class = "button" style = "background-color: var(--ss-orange-1);" id = "modeToggle">
+								<span class = "icon">
+									<i class = "fas fa-moon" id = "modeIcon"></i>
+								</span>
+							</span>
+						</span>
+						{% if login_info['logged_in?'] == 'yes' %}
+						<div class="navbar-item has-dropdown is-hoverable">
+						<a class="navbar-link">
+							<figure class="image is-32x32 m-3">
+								<img class="is-rounded" src="{{ login_info['avatar'] }}">
+							</figure>
+							<span>{{ login_info['username'] }}</span>
+						</a>
+
+						<div class="navbar-dropdown is-right">
+							<a class="navbar-item">
+								Profile
+							</a>
+							<hr class="navbar-divider">
+							<a id = "logout_button" class="navbar-item">
+								Logout
+							</a>
+						</div>
+						{% endif %}
+					</div>
+				</div>
+			</div>
+		</nav>
+	</div>
+	
+	<div class = "hero-body">
+		<div class = "container has-text-centered">
+			<p class = "title" style = "color: white;"> Slapping Salamanders Official Website </p>
+			<p class = "subtitle" style = "color: white;"> Welcome to the official website for the slapping salamanders discord server! </p>
+		</div>
+	</div>
+	
+	<div class = "hero-foot">
+	</div>
+</div>
+
+<script>
+{% if login_info['logged_in?'] == 'yes' %}
+//script for logging out
+logout_button = document.getElementById('logout_button');
+logout_button.addEventListener('click', () => {
+	fetch('{{ url_for("logout") }}', {
+		method: 'POST',
+		body: 'initiate_logout'
+	}).then(response => {
+		// Handle the response
+		if (!response.ok) {
+			throw new Error('Network response was not ok');
+		}
+		return response.json(); // Parse the response as JSON
+	}).then(data => {
+		console.log(data);
+		if (data['status'] === "success") {
+			alert('You have been logged out successfully!');
+			window.location.reload();
+		}
+		else if (data['status'] === "failure") {
+			alert('Could not log you out successfully! Please try again!');
+		}
+	});
+});
+{% endif %}
+//script for mobile phone users to toggle the nav menu when they click on the navbar burger.
+const navBurger = document.getElementById('navBurger');
+const navMenu = document.getElementById(navBurger.dataset.target);
+
+navBurger.addEventListener('click', () => {
+	navBurger.classList.toggle('is-active');
+	navMenu.classList.toggle('is-active');
+});
+
+// Script for mode toggle button. Needs to be placed here because it cannot be placed above where the mode toggle has been defined.
+const modeToggle = document.getElementById('modeToggle');
+const modeIcon = document.getElementById('modeIcon');
+
+function updateToggleIcon() {
+	const currTheme = getTheme();
+	
+	if (currTheme === "light") {
+		modeIcon.classList.remove('fa-sun');
+		modeIcon.classList.add('fa-moon');
+	}
+	else if (currTheme === "dark") {
+		modeIcon.classList.remove('fa-moon');
+		modeIcon.classList.add('fa-sun');
+	}
+	return;
+}
+
+modeToggle.addEventListener('click', () => {
+	changeTheme();
+	syncBulmaTheme();
+	updateToggleIcon();
+});
+
+updateToggleIcon();
+</script>
+
+<div style = "background-color: var(--ss-orange-1);">
+<section class = "section is-large">
+	<div class = "container has-text-centered">
+		<p class = "subtitle">
+			This is the official website for the slapping salamanders discord server! Members can register for an account or login via this website. You can also view the leaderboards! Once logged in you can view much more, like info related to your activity and ranking on the server!
+			
+			Our server is an ever growing community of friends who stay by each other's side and have fun on a daily basis! Come join us if you havent already <3!
+		</p>
+	</div>
+</section>
+<br/>
+<section>
+	<nav class = "level" style = "background-color: var(--ss-orange-1);">
+		<div class = "level-item has-text-centered">
+			<div>
+				<p class = "heading">Members</p>
+				<p class = "title">129</p>
+			</div>
+		</div>
+		<div class = "level-item has-text-centered">
+			<div>
+				<p class = "heading">Moderators</p>
+				<p class = "title">4</p>
+			</div>
+		</div>
+		<div class = "level-item has-text-centered">
+			<div>
+				<p class = "heading">Bots</p>
+				<p class = "title">20</p>
+			</div>
+		</div>
+	</nav>
+</section>
+<br/>
+<br/>
+<br/>
+
+<section class = "section is-medium">
+	<div class = "box" style = "background-color: var(--ss-orange-2);">
+		<div class = "container has-text-centered">
+			<br/>
+			<br/>
+			<p class = "subtitle">
+				Join our discord server today and become a slapper! All salamanders deserve to be slapped and loved 🥰!
+			</p>
+			<br/>
+			<span>
+				<a class = "button" style = "background-color: var(--ss-blue-1);" href = "https://discord.com/invite/9zefyaq2Za" target = "_blank">
+					<span class = "icon">
+						<i class = "fab fa-discord"></i>
+					</span>
+					<span>Join Discord Server</span>
+				</a>
+			</span>
+			<br/>
+			<br/>
+		</div>
+	</div>
+</section>
+
+<footer class = "footer" style = "background-color: var(--ss-blue-1);">
+	<div class = "content has-text-centered">
+		© Copyright 2024. All rights reserved. <strong>Sallie</strong> & The <strong>Slapping Salamanders</strong> discord server have been made by and are owned by typedecker. Any attempt to copy the work without permission shall be dealt with strictly.
+	</div>
+</footer>
+</div>
+
+</body>
+
+</html>
