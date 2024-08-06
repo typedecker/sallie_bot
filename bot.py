@@ -810,7 +810,7 @@ def get_boost_gain(old_value, member) :
     # if tier == '++' : tier = ((count - 4) * 0.1) + 4
     if tier == '++' : tier = 4
     
-    return (old_value * int(tier))
+    return (old_value * (int(tier) + 1))
 
 @bot.event
 async def on_message(message) :
