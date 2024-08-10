@@ -70,6 +70,7 @@ _Task_Class.__del__ = _patched_del
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
+SPAM_CHANNEL_ID = 1245681028178251818
 AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
 CONFESSION_CHANNEL_ID = 1239309061585899572
 BOOSTER_NOTIF_CHANNEL_ID = 1269368301256179772
@@ -1212,7 +1213,7 @@ async def on_message(message) :
         await generate_rank_card(message)
     
     
-    if not message.author.bot :
+    if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
         if message.author.id in LEVELUP_TIMES :
             if not ((datetime.now(dt.UTC) - LEVELUP_TIMES[message.author.id]['time']) > dt.timedelta(seconds = 60)) :
                 return
