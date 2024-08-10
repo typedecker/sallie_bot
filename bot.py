@@ -12,7 +12,7 @@ print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 import nest_asyncio
 nest_asyncio.apply()
 
-import discord, pyrebase, os, asyncio, flask, sys, secrets
+import discord, pyrebase, os, asyncio, flask, sys, secrets, random, io
 from discord.ext import tasks
 from gtts import gTTS
 from flask import Flask, render_template, redirect, url_for, request, make_response, session
@@ -20,6 +20,7 @@ from datetime import datetime
 from threading import Thread
 from yt_dlp import YoutubeDL
 from markupsafe import escape
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 import datetime as dt
 import ratelimit_handler as rh
@@ -69,6 +70,7 @@ _Task_Class.__del__ = _patched_del
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
+AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
 CONFESSION_CHANNEL_ID = 1239309061585899572
 BOOSTER_NOTIF_CHANNEL_ID = 1269368301256179772
 BOOSTER_TIER_ROLE_IDS = {'1': 1269733606432051210,
@@ -95,6 +97,8 @@ HELP_DICT = {
             'lb': ['$$lb <counter-type:slap|bump|boost|levels>', 'Displays the leaderboards for the given counter-type.'],
             'revive': ['$$revive @person1 @person2 ...', 'Sends a sweet revival message to whoever is pinged in their DMs.'],
             'my_discord_id': ['$$my_discord_id', 'Displays the user\'s discord id. Can be used for logging into the website!'],
+            'rank': ['$$rank @member', 'Sends back a rank card for the member pinged, if no user is pinged it sends the rank card for the command user.'],
+            'level': ['$$level @member', 'Alias for $$rank, Sends back a rank card for the member pinged, if no user is pinged it sends the rank card for the command user.'],
             'boost[ADMIN ONLY]': ['$$boost @booster', 'Updates the database to store the pinged member as a booster.[ADMIN ONLY]'],
             }
 
@@ -131,11 +135,63 @@ bot = discord.Client(intents = intents)
 
 ratelimiter = rh.RateLimiter(unit_time = 5000, default_rl = 1)
 
+large_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 25)
+small_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 15)
+
 voice_client = None
 currently_playing = None
 music_cmd_channel_id = None
 is_playing, is_paused = False, True
 music_queue = []
+
+LEVELUP_TIMES = {}
+
+get_summation_func = lambda func : lambda x : sum([func(k) for k in range(x + 1)])
+level_func = lambda x : (5 * (x ** 2)) + (50 * x) + 100
+level_summation_func = get_summation_func(level_func)
+
+def calculate_level(xp, lvl_func) :
+    lvl = 0
+    needed = lvl_func(0)
+    while xp >= needed :
+        xp -= needed
+        lvl += 1
+        needed = lvl_func(lvl)
+        continue
+    return lvl
+
+def get_font(content_length) :
+    font_size = 25
+    letter_capacity = 14
+    while letter_capacity < content_length :
+        font_size -= 1
+        letter_capacity += 1.1
+        continue
+    font = ImageFont.truetype(font = 'assets/arial.ttf', size = font_size)
+    return font
+
+async def fetch_invite_data(guild = None) :
+    guild = guild or bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
+    invites = await guild.invites()
+    invite_data = {}
+    for invite in invites :
+        invite_data[invite.code] = {'inviter_id' : invite.inviter.id,
+                                    'inviter_name' : invite.inviter.name,
+                                    'uses' : invite.uses}
+        continue
+    return invite_data
+
+async def sync_db_invite_cache() :
+    guild = bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
+    invites = await guild.invites()
+    
+    for invite in invites :
+        invite_info = {'inviter_id' : invite.inviter.id,
+                       'inviter_name' : invite.inviter.name,
+                       'uses' : invite.uses}
+        firebase_db_obj.child('invite_cache').child(invite.code).set(invite_info)
+        continue
+    return
 
 async def review_ping_check_iteration(member, review_ping_channel) :
     REVIEW_PING_ROLE_ID = 1242796399754743808
@@ -195,6 +251,8 @@ async def on_ready() :
     if ENVIRONMENT_TYPE == 'PROD' :
         bot_updatation.start()
     
+    await sync_db_invite_cache()
+    
     BOT_READY = True
     BOT_START_TIME = datetime.now(dt.UTC)
     return
@@ -203,7 +261,63 @@ async def on_ready() :
 async def on_resume() :
     if not bot_updatation.is_running() and ENVIRONMENT_TYPE == 'PROD' :
         bot_updatation.start()
+    
+    await sync_db_invite_cache()
+    
     BOT_START_TIME = datetime.now(dt.UTC)
+    return
+
+@bot.event
+async def on_invite_create(invite) :
+    invite_info = {'inviter_id' : invite.inviter.id,
+                   'inviter_name' : invite.inviter.name,
+                   'uses' : invite.uses}
+    
+    firebase_db_obj.child('invite_cache').child(invite.code).set(invite_info)
+    
+    audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
+    await audit_logs_channel.send(f'[INVITE CREATION LOG]: An invite was created by {invite.inviter.name}.')
+    return
+
+@bot.event
+async def on_invite_delete(invite) :
+    invite_cache = firebase_db_obj.child('invite_cache').get()
+    
+    if invite_cache == None : return
+    if invite.code not in invite_cache.val() : return
+    
+    invite_info = firebase_db_obj.child('invite_cache').child(invite.code).get().val()
+    firebase_db_obj.child('invite_cache').child(invite.code).remove()
+    
+    audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
+    await audit_logs_channel.send(f'[INVITE DELETION LOG]: An invite by {invite_info["inviter_name"]} was deleted.')
+    return
+
+@bot.event
+async def on_member_join(member) :
+    guild = bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
+    
+    # welcome stuff..
+    
+    # ---
+    # invite stuff..
+    
+    audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
+    
+    invites_cache = firebase_db_obj.child('invite_cache').get().val()
+    updated_invites = await fetch_invite_data(guild)
+    
+    for code, info in updated_invites.items() :
+        if info['uses'] > invites_cache[code]['uses'] :
+            # .. this is the invite used to join.
+            await audit_logs_channel.send(f'[INVITATION DETECTION LOGS]: {member.name} was invited by {info["inviter_name"]}.')
+            pass
+        continue
+    return
+
+@bot.event
+async def on_raw_member_remove(member) :
+    # remove all their data from the database.
     return
 
 # ---------------------------------------------------------------------------------
@@ -251,12 +365,24 @@ def play_next() :
 def fetch_counter_data(counter_type) :
     global firebase_db_obj
     
-    if counter_type not in ['bump', 'slap', 'levels', 'boost'] : return {}
+    if counter_type not in ['bump', 'slap', 'boost'] : return {}
     data = {}
     
     salaslappers = firebase_db_obj.child(counter_type).get()
     for salaslapper, salaslapper_data in salaslappers.val().items() :
         data[salaslapper_data['username']] = salaslapper_data['count'] if 'count' in salaslapper_data else 0
+        continue
+    return data
+
+def fetch_level_data() :
+    global firebase_db_obj
+    
+    data = {}
+    
+    salaslappers = firebase_db_obj.child('levels').get()
+    for salaslapper, salaslapper_data in salaslappers.val().items() :
+        data[salaslapper_data['username']] = {'xp': salaslapper_data['xp'] if 'xp' in salaslapper_data else 0, 
+                                              'level': salaslapper_data['level'] if 'level' in salaslapper_data else 0}
         continue
     return data
 
@@ -344,17 +470,26 @@ def leaderboard_page(counter_type) :
             return render_template('error_redirect_page_template.html', error = {'title': 'DB Startup Error', 'description': 'The database has either not started up properly or is facing some issues, please try again later.'})
         # return 'Bot is currently either starting up or undergoing some internal issues, so the leaderboard data is unavailable right now.'
     
-    if counter_type not in ['bump', 'slap', 'levels'] :
+    if counter_type not in ['bump', 'slap', 'boost', 'levels'] :
         return render_template('error_redirect_page_template.html', error = {'title': 'Invalid Leaderboard Error', 'description': 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'})
         # return 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'
     
-    raw_data = fetch_counter_data(counter_type)
-    data = []
-    rank = 1
-    for data_key in sorted(raw_data, key = raw_data.get, reverse = True) :
-        data.append({'rank': rank, 'username': data_key, 'count': raw_data[data_key]})
-        rank += 1
-        continue
+    if counter_type == 'levels' :
+        raw_data = fetch_level_data()
+        data = []
+        rank = 1
+        for data_key in sorted(raw_data, key = lambda k: raw_data.get(k)['xp'], reverse = True) :
+            data.append({'rank': rank, 'username': data_key, 'count': raw_data[data_key]['level']})
+            rank += 1
+            continue
+    else :
+        raw_data = fetch_counter_data(counter_type)
+        data = []
+        rank = 1
+        for data_key in sorted(raw_data, key = raw_data.get, reverse = True) :
+            data.append({'rank': rank, 'username': data_key, 'count': raw_data[data_key]})
+            rank += 1
+            continue
     return render_template('leaderboard_page_template.html', counter_type = counter_type.title(), data = data)
 
 @app.route('/login')
@@ -802,7 +937,11 @@ async def on_boost(booster) :
     firebase_db_obj.child('boost').child(str(booster.id)).child('tier').set(tier)
     return
 
-def get_boost_gain(old_value, member) :
+async def on_unboost(booster) :
+    # ... do this in a bit
+    return
+
+def get_boost_gain(old_value, member, float_allowed = False) :
     name = firebase_db_obj.child('boost').child(member.id).child('username').get().val()
     count = firebase_db_obj.child('boost').child(member.id).child('count').get().val() or 0
     tier = firebase_db_obj.child('boost').child(member.id).child('tier').get().val() or '0'
@@ -810,11 +949,65 @@ def get_boost_gain(old_value, member) :
     # if tier == '++' : tier = ((count - 4) * 0.1) + 4
     if tier == '++' : tier = 4
     
-    return (old_value * int(tier))
+    if not float_allowed :
+        return (old_value * (int(tier) + 1))
+    return (old_value + ((int(tier) / 10) * old_value))
+
+async def generate_rank_card(message) :
+    member = message.mentions[0] if any(message.mentions) else message.author
+    
+    size = (109, 109)
+    pfp_asset = member.avatar.with_size(128)
+    pfp_img_data = io.BytesIO(await pfp_asset.read())
+    pfp_img_obj = Image.open(pfp_img_data)
+    pfp_img_obj = pfp_img_obj.resize(size)
+    
+    mask = Image.new('L', size, 0)
+    draw = ImageDraw.Draw(mask) 
+    draw.ellipse((0, 0) + size, fill = 255)
+    
+    output_pfp_img = ImageOps.fit(pfp_img_obj, mask.size, centering = (0.5, 0.5))
+    output_pfp_img.putalpha(mask)
+    
+    img = Image.open('assets/rank_card_template.png')
+    I1 = ImageDraw.Draw(img)
+    
+    level_data = firebase_db_obj.child('levels').get().val()
+    print(level_data)
+    sys.stdout.flush()
+    # {id: {'username': ..., 'xp': ...}}
+    ranked_id_list = sorted(level_data, key = lambda k : level_data.get(k)['xp'], reverse = True)
+    
+    member_info = level_data.get(str(member.id)) or {'username': member.name, 'xp': 0}
+    member_name = member.name
+    member_rank = ranked_id_list.index(str(member.id)) + 1 if str(member.id) in ranked_id_list else 'undefined'
+    member_xp = member_info['xp']
+    member_level = calculate_level(member_xp, level_func)
+    
+    I1.text((183, 44), "{member_name}".format(member_name = member_name), fill = (0, 0, 0), font = get_font(len("{member_name}".format(member_name = member_name))))
+    I1.text((183, 97), "Rank: {member_rank}".format(member_rank = member_rank), fill = (0, 0, 0), font = small_font)
+    member_current_lvl_xp = member_xp - level_summation_func(member_level - 1)
+    print((member_current_lvl_xp), (level_func(member_level)), (33 + ((378 - 33) * (member_current_lvl_xp / level_func(member_level))), ((member_current_lvl_xp / level_func(member_level)))))
+    sys.stdout.flush()
+    x1 = 33 + ((378 - 33) * (member_current_lvl_xp / level_func(member_level)))
+    I1.rounded_rectangle([33, 165, x1, 185], radius = 10, fill = (231, 162, 44, 230))
+    I1.text((40, 166), "Level: {member_level}(XP: {xp})".format(member_level = member_level, xp = str(round((member_xp - level_summation_func(member_level - 1)), 2)) + '/' + str(round(level_func(member_level), 2))), fill = (0, 0, 0), font = small_font)
+    
+    _, _, _, pfp_mask = output_pfp_img.split()
+    img.paste(output_pfp_img, (36, 28), pfp_mask)
+    
+    sallie_overlay_img = Image.open('assets/rank_card_template_overlay.png').convert('RGBA')
+    img.paste(sallie_overlay_img, (0, 0), mask = sallie_overlay_img)
+    
+    with io.BytesIO() as image_binary :
+        img.save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await message.channel.send(file = discord.File(fp = image_binary, filename = 'image.png'))
+    return
 
 @bot.event
 async def on_message(message) :
-    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
@@ -1015,7 +1208,33 @@ async def on_message(message) :
         await on_boost(booster)
         await message.channel.send('Noted master adi! I have modified my databases as per ur wishes hehe!!')
         return
-
+    if message.content.lower().startswith('$$rank') or message.content.lower().startswith('$$level') :
+        await generate_rank_card(message)
+    
+    
+    if not message.author.bot :
+        if message.author.id in LEVELUP_TIMES :
+            if not ((datetime.now(dt.UTC) - LEVELUP_TIMES[message.author.id]['time']) > dt.timedelta(seconds = 60)) :
+                return
+            if LEVELUP_TIMES[message.author.id]['content'] == message.content :
+                return
+        
+        level_msg_template = 'YAYY!!! {mention} just reached a new level of slapping, by slapping a total of {level} thousand salamanders!'
+        
+        name = firebase_db_obj.child('levels').child(message.author.id).child('username').get().val()
+        xp = firebase_db_obj.child('levels').child(message.author.id).child('xp').get().val() or 0
+        level = firebase_db_obj.child('levels').child(message.author.id).child('level').get().val() or 0
+        
+        xp += get_boost_gain(random.uniform(15, 25), message.author, float_allowed = True)
+        new_level = calculate_level(xp, level_func)
+        if ((new_level - level) > 0) :
+            await message.channel.send(level_msg_template.format(mention = message.author.mention, level = new_level))
+        
+        firebase_db_obj.child('levels').child(str(message.author.id)).child('username').set(message.author.name)
+        firebase_db_obj.child('levels').child(str(message.author.id)).child('xp').set(xp)
+        firebase_db_obj.child('levels').child(str(message.author.id)).child('level').set(new_level)
+        
+        LEVELUP_TIMES[message.author.id] = {'time': datetime.now(dt.UTC), 'content': message.content}
     return
 
 async def BOT_MAIN_FUNC(BOT_TOKEN) :
