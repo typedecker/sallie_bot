@@ -349,6 +349,7 @@ def play_next() :
     is_playing = True
     if len(music_queue) > 0 :
         response_obj = music_queue.pop(0)
+        print(response_obj, 'OOF OOF MM YES DADDY FUCK ME HARDER PWEASE')
         m_url, song_title = response_obj['source'], response_obj['title']
         voice_client.play(discord.FFmpegPCMAudio(m_url, **FFMPEG_OPTIONS), after = lambda x : play_next())
         currently_playing = response_obj.copy()
