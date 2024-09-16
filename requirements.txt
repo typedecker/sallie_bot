@@ -7,6 +7,6 @@ pyrebase4
 discord.py[voice]
 PyNaCl
 gtts
-pillow
+pillow==10.3.0
 ffmpeg
 yt-dlp
