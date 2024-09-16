@@ -959,7 +959,8 @@ async def generate_rank_card(message) :
     member = message.mentions[0] if any(message.mentions) else message.author
     
     size = (109, 109)
-    pfp_asset = member.avatar.with_size(128)
+    pfp = member.guild_avatar or member.avatar
+    pfp_asset = pfp.with_size(128)
     pfp_img_data = io.BytesIO(await pfp_asset.read())
     pfp_img_obj = Image.open(pfp_img_data)
     pfp_img_obj = pfp_img_obj.resize(size)
