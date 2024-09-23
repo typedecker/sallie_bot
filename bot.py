@@ -1065,7 +1065,7 @@ async def on_message(message) :
             
             firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('username').set(message.interaction_metadata.user.name)
             firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('count').set(count + 1)
-        elif message.interaction.name == 'bump' :
+        elif message.interaction.name == 'confess' :
             print('THE PERSON WHO TRIED CONFESSING WAS: %s', message.interaction_metadata.user.name)
         return
     
