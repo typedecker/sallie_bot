@@ -183,6 +183,8 @@ async def fetch_invite_data(guild = None) :
     return invite_data
 
 async def sync_db_invite_cache() :
+    firebase_db_obj.child('invite_cache').child('empty').set({})
+    
     guild = bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
     invites = await guild.invites()
     
@@ -278,6 +280,7 @@ async def on_invite_create(invite) :
     
     audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
     await audit_logs_channel.send(f'[INVITE CREATION LOG]: An invite was created by {invite.inviter.name}.')
+    await sync_db_invite_cache()
     return
 
 @bot.event
@@ -292,6 +295,7 @@ async def on_invite_delete(invite) :
     
     audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
     await audit_logs_channel.send(f'[INVITE DELETION LOG]: An invite by {invite_info["inviter_name"]} was deleted.')
+    await sync_db_invite_cache()
     return
 
 @bot.event
@@ -312,8 +316,10 @@ async def on_member_join(member) :
         if info['uses'] > invites_cache[code]['uses'] :
             # .. this is the invite used to join.
             await audit_logs_channel.send(f'[INVITATION DETECTION LOGS]: {member.name} was invited by {info["inviter_name"]}.')
-            pass
+            break
         continue
+    
+    await sync_db_invite_cache()
     return
 
 @bot.event
@@ -349,7 +355,7 @@ def play_next() :
     is_playing = True
     if len(music_queue) > 0 :
         response_obj = music_queue.pop(0)
-        print(response_obj, 'OOF OOF MM YES DADDY FUCK ME HARDER PWEASE')
+        print(response_obj)
         m_url, song_title = response_obj['source'], response_obj['title']
         voice_client.play(discord.FFmpegPCMAudio(m_url, **FFMPEG_OPTIONS), after = lambda x : play_next())
         currently_playing = response_obj.copy()
@@ -959,8 +965,7 @@ async def generate_rank_card(message) :
     member = message.mentions[0] if any(message.mentions) else message.author
     
     size = (109, 109)
-    pfp = member.guild_avatar or member.avatar
-    pfp_asset = pfp.with_size(128)
+    pfp_asset = member.avatar.with_size(128)
     pfp_img_data = io.BytesIO(await pfp_asset.read())
     pfp_img_obj = Image.open(pfp_img_data)
     pfp_img_obj = pfp_img_obj.resize(size)
@@ -1008,6 +1013,40 @@ async def generate_rank_card(message) :
         await message.channel.send(file = discord.File(fp = image_binary, filename = 'image.png'))
     return
 
+async def run_defamer_check(message) :
+    # Checks to see if the person who sent the message is trying to defame the server owner.
+    owner_aliases = ['owner', 'adi', 'dead server owner', 'typedecker', 'decker']
+    defamation_words = ['pedo', 'pedophile', 'rape']
+    defamation_phrases = ['owner is a pedo', 'owner is a pedophile', 'pedo owner', 'pedophile owner', 'typedecker is a pedo', 'pedo typedecker', 'pedo decker', 'typedecker is a pedophile', 'pedophile typedecker']
+    
+    danger_index = 0 # the higher the index's value the higher the danger posed by the person writing that message.
+    
+    danger_index += 0.1 * len([alias for alias in owner_aliases if alias in message.content])
+    danger_index += 0.7 * len([word for word in defamation_words if word in message.content])
+    
+    if (any([alias for alias in owner_aliases if alias in message.content]) and any([word for word in defamation_words if word in message.content])) :
+        danger_index += 5.0
+    
+    danger_index += 100.0 * len([phrase for phrase in defamation_phrases if phrase in message.content])
+    
+    guild = bot.get_guild(PET_OWNER_GUILD)
+    if guild == None :
+        guild = await bot.fetch_guild(PET_OWNER_GUILD)
+    
+    # if guild.is_dm_spam_detected(): danger_index += 4.0
+    # if guild.is_raid_detected(): danger_index += 4.0
+    
+    # DANGER BASED ACTION.
+    # * danger < 5: Alert mods in the channel and in dms about it.
+    # * danger == 5: Alert mods in the channel and in dms and time the person out.
+    # * danger > 5: Alert mods in channel and dms and Ban the person who said it.
+    
+    # MOD_ROLE_ID = 
+    if danger_index < 5 :
+        # ...
+        pass
+    return
+
 @bot.event
 async def on_message(message) :
     global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES
@@ -1026,6 +1065,8 @@ async def on_message(message) :
             
             firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('username').set(message.interaction_metadata.user.name)
             firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('count').set(count + 1)
+        elif message.interaction.name == 'bump' :
+            print('THE PERSON WHO TRIED CONFESSING WAS: %s', message.interaction_metadata.user.name)
         return
     
     if message.type == discord.MessageType.premium_guild_subscription :
@@ -1034,6 +1075,8 @@ async def on_message(message) :
         
         await on_boost(booster)
         return
+    
+    # await run_defamer_check()
         
     if message.content.lower() == '$$ping' :
         await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
