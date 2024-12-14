@@ -203,6 +203,14 @@ async def review_ping_check_iteration(member, review_ping_channel) :
     print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.now(dt.UTC).astimezone(dt.timezone.utc) - member.joined_at)}')
     if any(found_role_list) and (datetime.now(dt.UTC).astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
         await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
+        
+        if member.dm_channel == None :
+            await member.create_dm()
+        try :
+            await member.dm_channel.send('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + message.channel.mention)
+        except :
+            await review_ping_channel.send(f'{member.mention} you are a FAT ASS BITCH for blocking me hmpf~! FUCK YOU! Why are you even in the server if you\'re never gonna talk?')
+        
         # await member.remove_roles(*found_role_list)
     return
 
@@ -1261,6 +1269,20 @@ async def on_message(message) :
         content = ' '.join(message.content.lower().split(' ')[2 : ])
         channel = message.channel_mentions[0]
         await channel.send(f'{content}')
+        await message.channel.send('Echoed successfully!')
+    if message.content.lower().startswith('$$echo_dm') :
+        content = ' '.join(message.content.lower().split(' ')[2 : ])
+        mention = message.mentions[0]
+        if mention != message.author : 
+            if mention.dm_channel == None :
+                await mention.create_dm()
+            try :
+                await mention.dm_channel.send(f'{content}')
+                await message.channel.send(f'DM Sent to {mention.mention} successfully!')
+            except :
+                await message.channel.send(f'DM could not be sent to {mention.mention} :disappointed: . They have me blocked! Please punish them for this adi master >w<~!')
+        else :
+            await message.channel.send('Why you tryna dm your own self cutie patootie~?")
     
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
