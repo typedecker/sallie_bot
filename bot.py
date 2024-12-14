@@ -207,8 +207,9 @@ async def review_ping_check_iteration(member, review_ping_channel) :
         if member.dm_channel == None :
             await member.create_dm()
         try :
-            await member.dm_channel.send('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + message.channel.mention)
-        except :
+            await member.dm_channel.send('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + review_ping_channel.mention)
+        except Exception as e :
+            print(e)
             await review_ping_channel.send(f'{member.mention} you are a FAT ASS BITCH for blocking me hmpf~! FUCK YOU! Why are you even in the server if you\'re never gonna talk?')
         
         # await member.remove_roles(*found_role_list)
