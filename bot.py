@@ -1257,6 +1257,10 @@ async def on_message(message) :
         return
     if message.content.lower().startswith('$$rank') or message.content.lower().startswith('$$level') :
         await generate_rank_card(message)
+    if message.content.lower().startswith('$$echo ') :
+        content = ' '.join(message.content.lower().split(' ')[2 : ])
+        channel = message.channel_mentions[0]
+        await channel.send(f'{content}')
     
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
