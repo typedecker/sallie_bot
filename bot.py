@@ -1282,7 +1282,7 @@ async def on_message(message) :
             except :
                 await message.channel.send(f'DM could not be sent to {mention.mention} :disappointed: . They have me blocked! Please punish them for this adi master >w<~!')
         else :
-            await message.channel.send('Why you tryna dm your own self cutie patootie~?")
+            await message.channel.send('Why you tryna dm your own self cutie patootie~?')
     
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
