@@ -12,7 +12,7 @@ print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 import nest_asyncio
 nest_asyncio.apply()
 
-import discord, pyrebase, os, asyncio, flask, sys, secrets, random, io
+import discord, pyrebase, os, asyncio, flask, sys, secrets, random, io, re
 from discord.ext import tasks
 from gtts import gTTS
 from flask import Flask, render_template, redirect, url_for, request, make_response, session
@@ -1266,24 +1266,68 @@ async def on_message(message) :
         return
     if message.content.lower().startswith('$$rank') or message.content.lower().startswith('$$level') :
         await generate_rank_card(message)
-    if message.content.lower().startswith('$$echo ') :
-        content = ' '.join(message.content.lower().split(' ')[2 : ])
-        channel = message.channel_mentions[0]
-        await channel.send(f'{content}')
-        await message.channel.send('Echoed successfully!')
-    if message.content.lower().startswith('$$echo_dm') :
-        content = ' '.join(message.content.lower().split(' ')[2 : ])
-        mention = message.mentions[0]
-        if mention != message.author : 
-            if mention.dm_channel == None :
-                await mention.create_dm()
+    if message.content.lower().startswith('$$echo ') and message.author.id == BOT_OWNER_ID :
+        try :
+            content = ' '.join(message.content.split(' ')[2 : ])
+            channel = message.channel_mentions[0]
+            await channel.send(f'{content}')
+            await message.channel.send('Echoed successfully!')
+        except :
+            await message.channel.send('Something went wrong when trying to execute this command :<')
+    if message.content.lower().startswith('$$echo_dm') and message.author.id == BOT_OWNER_ID :
+        try :
+            content = ' '.join(message.content.split(' ')[2 : ])
+            mention = message.mentions[0]
+            if mention != message.author : 
+                if mention.dm_channel == None :
+                    await mention.create_dm()
+                try :
+                    await mention.dm_channel.send(f'{content}')
+                    await message.channel.send(f'DM Sent to {mention.mention} successfully!')
+                except :
+                    await message.channel.send(f'DM could not be sent to {mention.mention} :disappointed: . They have me blocked! Please punish them for this adi master >w<~!')
+            else :
+                await message.channel.send('Why you tryna dm your own self cutie patootie~?')
+        except :
+            await message.channel.send('Something went wrong when trying to execute this command :<')
+    if message.content.lower().startswith('$$echo_reply') and message.author.id == BOT_OWNER_ID :
+        # $$echo_reply <channel_mention> <message_id> <content>
+        try :
+            cmd_args = message.content.split(' ')
+            content = ' '.join(cmd_args[3 : ])
+            channel = message.channel_mentions[0]
+            message_id = int(cmd_args[2])
+            
             try :
-                await mention.dm_channel.send(f'{content}')
-                await message.channel.send(f'DM Sent to {mention.mention} successfully!')
+                msg = channel.get_partial_message(message_id)
+                await msg.reply(f'{content}')
             except :
-                await message.channel.send(f'DM could not be sent to {mention.mention} :disappointed: . They have me blocked! Please punish them for this adi master >w<~!')
-        else :
-            await message.channel.send('Why you tryna dm your own self cutie patootie~?')
+                msg = await channel.fetch_message(message_id)
+                await msg.reply(f'{content}')
+
+            await message.channel.send('Reply sent successfully!')
+        except :
+            await message.channel.send('Something went wrong when trying to execute this command :<')
+    if message.content.lower().startswith('$$echo_react') and message.author.id == BOT_OWNER_ID :
+        # $$echo_react <channel_mention> <message_id> <reaction>
+        try :
+            cmd_args = message.content.split(' ')
+            channel = message.channel_mentions[0]
+            message_id = int(cmd_args[2])
+            emoji_str_raw = ' '.join(cmd_args[3 : ])
+            emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)[0]
+        
+            emoji = discord.PartialEmoji.from_str(emoji_str)
+            try :
+                msg = channel.get_partial_message(message_id)
+                await msg.add_reaction(emoji)
+            except :
+                msg = await channel.fetch_message(message_id)
+                await msg.add_reaction(emoji)
+
+            await message.channel.send('Reacted to the message successfully!')
+        except :
+            await message.channel.send('Something went wrong when trying to execute this command :<')
     
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
