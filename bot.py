@@ -1319,6 +1319,7 @@ async def on_message(message) :
         
             emoji = discord.PartialEmoji.from_str(emoji_str)
             if emoji.is_unicode_emoji(): emoji = discord.PartialEmoji.from_str(emoji_str[1 : -1])
+            emoji = [e for e in discord.Client.emojis if e.name == emoji.name][0]
             try :
                 msg = channel.get_partial_message(message_id)
                 await msg.add_reaction(emoji)
