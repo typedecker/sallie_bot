@@ -1317,9 +1317,8 @@ async def on_message(message) :
             emoji_str_raw = ' '.join(cmd_args[3 : ])
             emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)[0]
         
-            emoji = discord.PartialEmoji.from_str(emoji_str)
-            if emoji.is_unicode_emoji(): emoji = discord.PartialEmoji.from_str(emoji_str[1 : -1])
-            emoji = [e for e in discord.Client.emojis if e.name == emoji.name][0]
+            emoji = discord.PartialEmoji.from_str(emoji_str.strip())
+            if emoji.is_unicode_emoji(): emoji = emoji_str.strip()
             try :
                 msg = channel.get_partial_message(message_id)
                 await msg.add_reaction(emoji)
