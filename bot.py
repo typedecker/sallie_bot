@@ -100,7 +100,13 @@ HELP_DICT = {
             'my_discord_id': ['$$my_discord_id', 'Displays the user\'s discord id. Can be used for logging into the website!'],
             'rank': ['$$rank @member', 'Sends back a rank card for the member pinged, if no user is pinged it sends the rank card for the command user.'],
             'level': ['$$level @member', 'Alias for $$rank, Sends back a rank card for the member pinged, if no user is pinged it sends the rank card for the command user.'],
+            'website': ['$$website', 'Displays the URL for the home page of the server website!'],
+            'server_website': ['$$server_website', 'Alias for $$website, displays the URL for the homepage of the server website!'],
             'boost[ADMIN ONLY]': ['$$boost @booster', 'Updates the database to store the pinged member as a booster.[ADMIN ONLY]'],
+            'echo[ADMIN ONLY]': ['$$echo #channel-mention <content>', 'Sends a message with the content specified, in the channel mentioned.[ADMIN ONLY]'],
+            'echo_dm[ADMIN ONLY]': ['$$echo_dm @member-mention <content>', 'Sends a message with the content specified, in the dms of the member mentioned.[ADMIN ONLY]'],
+            'echo_reply[ADMIN ONLY]': ['$$echo_reply #channel-mention <message-id> <content>', 'Replies to the message corresponding the message id specified, with the content specified, in the channel mentioned.[ADMIN ONLY]'],
+            'echo_react[ADMIN ONLY]': ['$$echo_react #channel-mention <message-id> <emoji>', 'Reacts to the message corresponding the message id specified, with the reaction provided, in the channel mentioned.[ADMIN ONLY]'],
             }
 
 YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
@@ -1315,10 +1321,13 @@ async def on_message(message) :
             channel = message.channel_mentions[0]
             message_id = int(cmd_args[2])
             emoji_str_raw = ' '.join(cmd_args[3 : ])
-            emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)[0]
-        
-            emoji = discord.PartialEmoji.from_str(emoji_str.strip())
-            if emoji.is_unicode_emoji(): emoji = emoji_str_raw.strip()
+            emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)
+            
+            if emoji_str != [] :
+                emoji = discord.PartialEmoji.from_str(emoji_str.strip())
+            else :
+                emoji = emoji_str_raw.strip()
+            
             try :
                 msg = channel.get_partial_message(message_id)
                 await msg.add_reaction(emoji)
@@ -1340,6 +1349,8 @@ async def on_message(message) :
             print(e)
             
             await message.channel.send('Something went wrong when trying to execute this command :<')
+    if message.content.lower() in ['$$server_website', '$$website'] :
+        await message.channel.send('Here ya go! Lemme link you up with the server\'s website really quickly :3! https://sallie-bot.onrender.com/home ')
     
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
