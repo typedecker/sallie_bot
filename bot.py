@@ -1318,7 +1318,7 @@ async def on_message(message) :
             emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)[0]
         
             emoji = discord.PartialEmoji.from_str(emoji_str.strip())
-            if emoji.is_unicode_emoji(): emoji = emoji_str.strip()
+            if emoji.is_unicode_emoji(): emoji = emoji_str_raw.strip()
             try :
                 msg = channel.get_partial_message(message_id)
                 await msg.add_reaction(emoji)
@@ -1327,7 +1327,18 @@ async def on_message(message) :
                 await msg.add_reaction(emoji)
 
             await message.channel.send('Reacted to the message successfully!')
-        except :
+        except Exception as e :
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            
             await message.channel.send('Something went wrong when trying to execute this command :<')
     
     
