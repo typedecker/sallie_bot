@@ -1236,10 +1236,10 @@ async def on_message(message) :
         lb_type = message.content.lower()[len('$$lb ') : ]
         lb_data = fetch_counter_data(lb_type)
         
-        embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = f'{lb_type.title()} Leaderboards', description = f'Given below is the leaderboard for {lb_type}ing:')
+        embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = f'{lb_type.title()} Leaderboards', description = f'Given below is the top 25 leaderboard for {lb_type}ing:')
         
         rank = 1
-        for member_name in sorted(lb_data, key = lb_data.get, reverse = True) :
+        for member_name in sorted(lb_data, key = lb_data.get, reverse = True)[:25] :
             name = f'{rank}. {member_name}'
             desc = f'{lb_data[member_name]} points'
             embed.add_field(name = name, value = desc, inline = False)
