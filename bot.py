@@ -12,7 +12,7 @@ print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 import nest_asyncio
 nest_asyncio.apply()
 
-import discord, pyrebase, os, asyncio, flask, sys, secrets, random, io, re
+import discord, pyrebase, os, asyncio, flask, sys, secrets, random, io, re, math
 from discord.ext import tasks
 from gtts import gTTS
 from flask import Flask, render_template, redirect, url_for, request, make_response, session
