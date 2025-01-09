@@ -1141,7 +1141,7 @@ async def welcome_count_check(message) :
     emoji_str_raw = '<:sallie_pink_shiny_heart:1305443467073163265>'
     emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)
     if emoji_str != [] :
-        emoji = discord.PartialEmoji.from_str(emoji_str.strip())
+        emoji = discord.PartialEmoji.from_str(emoji_str[0].strip())
     else :
         emoji = emoji_str_raw.strip()
     await message.add_reaction(emoji)
