@@ -1111,7 +1111,7 @@ async def welcome_count_check(message) :
     if pre_existence: return # If join message has already been replied to with a welcome earlier, the current message isnt considered for point gain.
 
     # Fetch the current value of count from the database to add onto it.
-    count = firebase_db_obj.child('welcome').child(message.author.id).child('count').get().val() or 0
+    count = firebase_db_obj.child('welcome').child(str(message.author.id)).child('count').get().val() or 0
     
     if welcome_type == 'sticker':
         # If the welcome message was merely a sticker, add one to the point count.
@@ -1136,6 +1136,8 @@ async def welcome_count_check(message) :
 
     # Set the username to the username of the message author.
     firebase_db_obj.child('welcome').child(str(message.author.id)).child('username').set(message.author.name)
+    # Update the welcome cache to make sure the welcome messages cannot be exploited, with spam.
+    firebase_db_obj.child('welcome_cache').child(str(message.author.id)).child(str(og_msg.id)).child(welcome_type).set(True)
     
     # Sallie reacts to the message with a sallie pink heart to confirm it's addition
     emoji_str_raw = '<:sallie_pink_shiny_heart:1305443467073163265>'
