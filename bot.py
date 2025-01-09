@@ -95,7 +95,7 @@ HELP_DICT = {
             'm_pause': ['$$m_pause', 'Pauses the song.'],
             'm_resume': ['$$m_resume', 'Resumes the song.'],
             'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.'],
-            'lb': ['$$lb <counter-type:slap|bump|boost|levels>', 'Displays the leaderboards for the given counter-type.'],
+            'lb': ['$$lb <counter-type:slap|bump|welcome|boost|levels>', 'Displays the leaderboards for the given counter-type.'],
             'revive': ['$$revive @person1 @person2 ...', 'Sends a sweet revival message to whoever is pinged in their DMs.'],
             'my_discord_id': ['$$my_discord_id', 'Displays the user\'s discord id. Can be used for logging into the website!'],
             'rank': ['$$rank @member', 'Sends back a rank card for the member pinged, if no user is pinged it sends the rank card for the command user.'],
@@ -388,7 +388,7 @@ def play_next() :
 def fetch_counter_data(counter_type) :
     global firebase_db_obj
     
-    if counter_type not in ['bump', 'slap', 'boost'] : return {}
+    if counter_type not in ['bump', 'slap', 'boost', 'welcome'] : return {}
     data = {}
     
     salaslappers = firebase_db_obj.child(counter_type).get()
@@ -493,7 +493,7 @@ def leaderboard_page(counter_type) :
             return render_template('error_redirect_page_template.html', error = {'title': 'DB Startup Error', 'description': 'The database has either not started up properly or is facing some issues, please try again later.'})
         # return 'Bot is currently either starting up or undergoing some internal issues, so the leaderboard data is unavailable right now.'
     
-    if counter_type not in ['bump', 'slap', 'boost', 'levels'] :
+    if counter_type not in ['bump', 'slap', 'boost', 'welcome', 'levels'] :
         return render_template('error_redirect_page_template.html', error = {'title': 'Invalid Leaderboard Error', 'description': 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'})
         # return 'Whoops you are looking for the leaderboard of something that doesn\'t exist!'
     
@@ -1063,6 +1063,90 @@ async def run_defamer_check(message) :
         pass
     return
 
+def _welcome_calculate_decay_with_sharp_drop(time_diff: dt.timedelta):
+    """
+    Calculate points with an initial gradual decay and a drastic drop after 5 minutes.
+    """
+    seconds = time_diff.total_seconds()
+    minutes = seconds / 60
+    
+    # If time_diff exceeds 1 day, return 1.0
+    if seconds >= 86400:  # 24 hours
+        return 1.0
+    
+    # Parameters for the decay
+    scale = 5  # Maximum points for very short durations
+    initial_decay_rate = 0.5  # Slow decay for durations before 5 minutes
+    sharp_decay_rate = 3.0  # Drastic decay for durations after 5 minutes
+    threshold_minutes = 5  # Drastic decay starts after this time (in minutes)
+
+    if minutes <= threshold_minutes:
+        # Gradual decay before the threshold
+        return math.ceil(scale * math.exp(-initial_decay_rate * minutes))
+    
+    # Drastic decay after the threshold
+    adjusted_minutes = (minutes - threshold_minutes) / (1440 - threshold_minutes)  # Normalize to 1 day
+    return max(1.0, math.ceil(scale * math.exp(-sharp_decay_rate * adjusted_minutes)))
+
+async def welcome_count_check(message) :
+    og_msg = message.reference # Fetch the parent message for this reply message.
+
+    # If the member who joined is also the one writing this message, then its not considered for point gain.
+    if og_msg.author == message.author: return
+    # If the parent message isn't a member join message, then this message is not a welcome message.
+    if og_msg.type != discord.MessageType.new_member: return
+    # If the welcome message was sent 2 weeks or later past the member's joining, it isn't counted.
+    time_diff = (message.created_at - og_msg.created_at)
+    if time_diff > dt.timedelta(days = 14): return
+
+    # We categorize welcome messages into two types: stickers and text messages, both matter equally and give points. Here we figure out which type of message the current one is.
+    welcome_type = 'text'
+    if len(message.stickers) > 0 :
+        welcome_type = 'sticker'
+    else :
+        welcome_type = 'text'
+
+    # Fetch there already being a welcome message for the associated join message, of the detected type.
+    pre_existence = firebase_db_obj.child('welcome_cache').child(str(message.author.id)).child(str(og_msg.id)).child(welcome_type).get().val() or False
+    if pre_existence: return # If join message has already been replied to with a welcome earlier, the current message isnt considered for point gain.
+
+    # Fetch the current value of count from the database to add onto it.
+    count = firebase_db_obj.child('welcome').child(message.author.id).child('count').get().val() or 0
+    
+    if welcome_type == 'sticker':
+        # If the welcome message was merely a sticker, add one to the point count.
+        firebase_db_obj.child('welcome').child(str(message.author.id)).child('count').set(count + 1)
+        pass
+    elif welcome_type == 'text':
+        # If the welcome message was a full on text message, we give it a score based on certain aspects.
+        welcome_score = 1 # +1 for just being sent.
+        if any([k in message.content.lower() for k in ['welcome', 'wlcm']]):
+            # +1 for including the word WELCOME or wlcm or any other synonyms.
+            welcome_score += 1
+        if message.content.isupper() :
+            # +1 for being uppercase and excited!
+            welcome_score += 1
+
+        # scores the message for it's quickness after the joining of the member. adds a competitive sense to the whole thing.
+        welcome_score += _welcome_calculate_decay_with_sharp_drop(time_diff)
+
+        # Updates the count variable by incrementing it by the welcome score calculated.
+        firebase_db_obj.child('welcome').child(str(message.author.id)).child('count').set(count + welcome_score)
+        pass
+
+    # Set the username to the username of the message author.
+    firebase_db_obj.child('welcome').child(str(message.author.id)).child('username').set(message.author.name)
+    
+    # Sallie reacts to the message with a sallie pink heart to confirm it's addition
+    emoji_str_raw = '<:sallie_pink_shiny_heart:1305443467073163265>'
+    emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)
+    if emoji_str != [] :
+        emoji = discord.PartialEmoji.from_str(emoji_str.strip())
+    else :
+        emoji = emoji_str_raw.strip()
+    message.add_reaction(emoji)
+    return
+
 @bot.event
 async def on_message(message) :
     global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES
@@ -1091,6 +1175,9 @@ async def on_message(message) :
         
         await on_boost(booster)
         return
+    elif message.type == discord.MessageType.reply :
+        # ... check for qotd count[TODO] and welcome count[currently in development]
+        await welcome_count_check(message)
     
     # await run_defamer_check()
         
