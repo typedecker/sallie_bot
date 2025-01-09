@@ -1089,7 +1089,7 @@ def _welcome_calculate_decay_with_sharp_drop(time_diff: dt.timedelta):
     return max(1.0, math.ceil(scale * math.exp(-sharp_decay_rate * adjusted_minutes)))
 
 async def welcome_count_check(message) :
-    og_msg = message.reference # Fetch the parent message for this reply message.
+    og_msg = await message.channel.fetch_message(message.reference.message_id) # Fetch the parent message for this reply message.
 
     # If the member who joined is also the one writing this message, then its not considered for point gain.
     if og_msg.author == message.author: return
@@ -1144,7 +1144,7 @@ async def welcome_count_check(message) :
         emoji = discord.PartialEmoji.from_str(emoji_str.strip())
     else :
         emoji = emoji_str_raw.strip()
-    message.add_reaction(emoji)
+    await message.add_reaction(emoji)
     return
 
 @bot.event
