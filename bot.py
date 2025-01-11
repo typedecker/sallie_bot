@@ -74,11 +74,13 @@ SPAM_CHANNEL_ID = 1245681028178251818
 AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
 CONFESSION_CHANNEL_ID = 1239309061585899572
 BOOSTER_NOTIF_CHANNEL_ID = 1269368301256179772
+SALLIE_DM_LOG_CHANNEL_ID = 1327052773673664605
 BOOSTER_TIER_ROLE_IDS = {'1': 1269733606432051210,
                          '2': 1269733728025055334,
                          '3': 1269733769619701902,
                          '++': 1269733864637595670,}
 BOT_OWNER_ID = 568446269610000385
+BOT_SELF_USER_ID = 1231274952968372317
 PET_OWNER_GUILD = 1230967641200394302
 
 HELP_DICT = {
@@ -89,12 +91,12 @@ HELP_DICT = {
             'vc_connect': ['$$vc_connect', 'Connects to the same VC as the user who executed the command.'],
             'vc_disconnect': ['$$vc_disconnect', 'Disconnects from any VC that she might be in.'],
             'tts' : ['$$tts <message>', 'Converts the message from text to speech and plays it in VC.'],
-            'm_play': ['$$m_play <query>', 'Searches for the query provided and plays it if it founds anything similar. If a song is already playing the new song will be added to the queue.'],
-            'm_queue': ['$$m_queue', 'Displays the queue of songs'],
-            'm_skip': ['$$m_skip', 'Skips the song currently being played, if any.'],
-            'm_pause': ['$$m_pause', 'Pauses the song.'],
-            'm_resume': ['$$m_resume', 'Resumes the song.'],
-            'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.'],
+            # 'm_play': ['$$m_play <query>', 'Searches for the query provided and plays it if it founds anything similar. If a song is already playing the new song will be added to the queue.'],
+            # 'm_queue': ['$$m_queue', 'Displays the queue of songs'],
+            # 'm_skip': ['$$m_skip', 'Skips the song currently being played, if any.'],
+            # 'm_pause': ['$$m_pause', 'Pauses the song.'],
+            # 'm_resume': ['$$m_resume', 'Resumes the song.'],
+            # 'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.'],
             'lb': ['$$lb <counter-type:slap|bump|welcome|boost|levels>', 'Displays the leaderboards for the given counter-type.'],
             'revive': ['$$revive @person1 @person2 ...', 'Sends a sweet revival message to whoever is pinged in their DMs.'],
             'my_discord_id': ['$$my_discord_id', 'Displays the user\'s discord id. Can be used for logging into the website!'],
@@ -102,6 +104,7 @@ HELP_DICT = {
             'level': ['$$level @member', 'Alias for $$rank, Sends back a rank card for the member pinged, if no user is pinged it sends the rank card for the command user.'],
             'website': ['$$website', 'Displays the URL for the home page of the server website!'],
             'server_website': ['$$server_website', 'Alias for $$website, displays the URL for the homepage of the server website!'],
+            'activity_index': ['$$activity_index <hours>h <minutes>m <seconds>s', 'Looks back into it\'s message cache as queried by the user, using the lookback duration arguments, and calculates the activity index.',
             'boost[ADMIN ONLY]': ['$$boost @booster', 'Updates the database to store the pinged member as a booster.[ADMIN ONLY]'],
             'echo[ADMIN ONLY]': ['$$echo #channel-mention <content>', 'Sends a message with the content specified, in the channel mentioned.[ADMIN ONLY]'],
             'echo_dm[ADMIN ONLY]': ['$$echo_dm @member-mention <content>', 'Sends a message with the content specified, in the dms of the member mentioned.[ADMIN ONLY]'],
@@ -151,6 +154,8 @@ music_cmd_channel_id = None
 is_playing, is_paused = False, True
 music_queue = []
 
+messages_cache = []
+
 LEVELUP_TIMES = {}
 
 get_summation_func = lambda func : lambda x : sum([func(k) for k in range(x + 1)])
@@ -176,6 +181,12 @@ def get_font(content_length) :
         continue
     font = ImageFont.truetype(font = 'assets/arial.ttf', size = font_size)
     return font
+
+def get_datetime_str(do) :
+    return do.strftime(datetime_date_format)
+
+def get_datetime_obj(ds) :
+    return datetime.strptime(ds, datetime_date_format)
 
 async def fetch_invite_data(guild = None) :
     guild = guild or bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
@@ -1149,9 +1160,20 @@ async def welcome_count_check(message) :
     await message.add_reaction(emoji)
     return
 
+def calculate_activity_index(lookback_duration) :
+    # If messages cache is empty then return.
+    if len(messages_cache) == 0: return
+    messages_cache_objs = [get_datetime_obj(ds) for ds in messages_cache]
+
+    now_time = datetime.now(dt.UTC)
+    relevant_objs = [obj for obj in messages_cache_objs if (now_time - lookback_duration) <= obj <= now_time]
+
+    activity_index = (len(relevant_objs) / lookback_duration) # Number of messages per unit time.
+    return activity_index
+
 @bot.event
 async def on_message(message) :
-    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, messages_cache
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
@@ -1177,11 +1199,40 @@ async def on_message(message) :
         
         await on_boost(booster)
         return
+    elif message.channel.type == discord.ChannelType.private :
+        ## Can be added in later if needed, removed cuz I feel like its required for us to also see sallie's messages for continuity of message flow in DMs
+        # if message.author.id != BOT_SELF_USER_ID :
+        dm_log_channel = bot.get_channel(SALLIE_DM_LOG_CHANNEL_ID) # Fetches the DM Logging Channel for sallie. Uses non async way to prevent ratelimit issues.
+
+        # The section under this essentially divides a too long message sent by a nitro user or otherwise, into smaller manageable parts to send off separately.
+        DM_LOG_CHAR_LIM = 1000 # Half of 2000[discord's max message length for free users] to get some leeway if needed.
+        parts = []
+        start, end = 0, 0
+        while end < len(message.content) :
+            if (end - start) >= DM_LOG_CHAR_LIM :
+                parts.append(message.content[start : end])
+                start = end
+            end += 1
+            continue
+        if (end - start) != 0: parts.append(message.content[start : end]
+
+        # Prepares and sends the messages in parts if needed, with the appropriate info annotated above it.
+        msg_creation_time_str = message.created_at.strftime(datetime_date_format)
+        initial_log_annotation = f'* __**Author:**__ ```{message.author.name} (message.author.display_name)``` {message.author.mention}\n* __**Message-ID:**__ ```{message.id}```\n* __**Created-At:**__ ```{msg_creation_time_str}```\n'
+        for p, part in enumerate(parts) :
+            part_annotation = f'* __**Part:**__ {p + 1}\n'
+            part_content = f'{initial_log_annotation}{part_annotation}{part}'
+            await dm_log_channel.send(part_content)
+            continue
+        
     elif message.type == discord.MessageType.reply :
         # ... check for qotd count[TODO] and welcome count[currently in development]
         await welcome_count_check(message)
     
     # await run_defamer_check()
+    if message.channel.type != discord.ChannelType.private :
+        if message.guild.id == PET_OWNER_GUILD :
+            messages_cache.append(get_datetime_str(message.created_at))
         
     if message.content.lower() == '$$ping' :
         await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
@@ -1427,19 +1478,23 @@ async def on_message(message) :
             await message.channel.send('Reacted to the message successfully!')
         except Exception as e :
             print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
             
             await message.channel.send('Something went wrong when trying to execute this command :<')
     if message.content.lower() in ['$$server_website', '$$website'] :
         await message.channel.send('Here ya go! Lemme link you up with the server\'s website really quickly :3! https://sallie-bot.onrender.com/home ')
+    if message.content.lower().startswith('$$activity_index ') :
+        try :
+            duration = message.content.lower()[len('$$activity_index ') : ]
+            duration_parts = duration.strip().split(' ') + ['0h', '0m', '1s']
+            
+            hours = int([h for h in duration if h.endswith('h')][0][ : -1])
+            minutes = int([m for m in duration if h.endswith('m')][0][ : -1])
+            seconds = int([s for s in duration if h.endswith('s')][0][ : -1])
+    
+            activity_index = calculate_activity_index(dt.timedelta(hours = hours, minutes = minutes, seconds = seconds))
+            await message.channel.send(f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
+        except Exception as e:
+            print(e)
     
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
