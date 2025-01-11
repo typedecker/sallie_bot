@@ -186,7 +186,7 @@ def get_datetime_str(do) :
     return do.strftime(datetime_date_format)
 
 def get_datetime_obj(ds) :
-    return datetime.strptime(ds, datetime_date_format)
+    return datetime.strptime(ds, datetime_date_format).replace(tzinfo = dt.UTC)
 
 async def fetch_invite_data(guild = None) :
     guild = guild or bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
