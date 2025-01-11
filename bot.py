@@ -1168,7 +1168,8 @@ def calculate_activity_index(lookback_duration) :
     now_time = datetime.now(dt.UTC)
     relevant_objs = [obj for obj in messages_cache_objs if (now_time - lookback_duration) <= obj <= now_time]
 
-    activity_index = (len(relevant_objs) / lookback_duration) # Number of messages per unit time.
+    time = lookback_duration.total_seconds() / 30 # 30 seconds as the minimum unit of time measurement.
+    activity_index = (len(relevant_objs) / time) # Number of messages per unit time.
     return activity_index
 
 @bot.event
@@ -1487,9 +1488,9 @@ async def on_message(message) :
             duration = message.content.lower()[len('$$activity_index ') : ]
             duration_parts = duration.strip().split(' ') + ['0h', '0m', '1s']
             
-            hours = int([h for h in duration if h.endswith('h')][0][ : -1])
-            minutes = int([m for m in duration if h.endswith('m')][0][ : -1])
-            seconds = int([s for s in duration if h.endswith('s')][0][ : -1])
+            hours = int([h for h in duration_parts if h.endswith('h')][0][ : -1])
+            minutes = int([m for m in duration_parts if h.endswith('m')][0][ : -1])
+            seconds = int([s for s in duration_parts if h.endswith('s')][0][ : -1])
     
             activity_index = calculate_activity_index(dt.timedelta(hours = hours, minutes = minutes, seconds = seconds))
             await message.channel.send(f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
