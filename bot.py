@@ -1230,7 +1230,7 @@ async def on_message(message) :
         await welcome_count_check(message)
     
     # await run_defamer_check()
-    if message.channel.type != discord.ChannelType.private :
+    if message.channel.type != discord.ChannelType.private and message.author.id != BOT_SELF_USER_ID and (not message.author.bot) :
         if message.guild.id == PET_OWNER_GUILD :
             messages_cache.append(get_datetime_str(message.created_at))
         
