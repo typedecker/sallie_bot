@@ -1493,7 +1493,14 @@ async def on_message(message) :
     
             activity_index = calculate_activity_index(dt.timedelta(hours = hours, minutes = minutes, seconds = seconds))
             await message.channel.send(f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
-        except Exception as e:
+        except ValueError as e:
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
+            print(e)
             print(e)
     
     
