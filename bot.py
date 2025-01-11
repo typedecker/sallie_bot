@@ -1221,7 +1221,7 @@ async def on_message(message) :
         initial_log_annotation = f'* __**Author:**__ ```{message.author.name} (message.author.display_name)``` {message.author.mention}\n* __**Message-ID:**__ ```{message.id}```\n* __**Created-At:**__ ```{msg_creation_time_str}```\n'
         for p, part in enumerate(parts) :
             part_annotation = f'* __**Part:**__ {p + 1}\n'
-            part_content = f'{initial_log_annotation}{part_annotation}{part}'
+            part_content = f'{initial_log_annotation}{part_annotation}> {part}'
             await dm_log_channel.send(part_content)
             continue
         
