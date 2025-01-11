@@ -1218,7 +1218,7 @@ async def on_message(message) :
 
         # Prepares and sends the messages in parts if needed, with the appropriate info annotated above it.
         msg_creation_time_str = message.created_at.strftime(datetime_date_format)
-        initial_log_annotation = f'* __**Author:**__ ```{message.author.name} (message.author.display_name)``` {message.author.mention}\n* __**Message-ID:**__ ```{message.id}```\n* __**Created-At:**__ ```{msg_creation_time_str}```\n'
+        initial_log_annotation = f'* __**Author:**__ ```{message.author.name} ({message.author.display_name})``` {message.author.mention}\n* __**Message-ID:**__ ```{message.id}```\n* __**Created-At:**__ ```{msg_creation_time_str}```\n'
         for p, part in enumerate(parts) :
             part_annotation = f'* __**Part:**__ {p + 1}\n'
             part_content = f'{initial_log_annotation}{part_annotation}> {part}'
