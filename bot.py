@@ -1489,8 +1489,8 @@ async def on_message(message) :
             duration_parts = duration.strip().split(' ') + ['0h', '0m', '1s']
             
             hours = int([h for h in duration_parts if h.endswith('h')][0][ : -1])
-            minutes = int([m for m in duration_parts if h.endswith('m')][0][ : -1])
-            seconds = int([s for s in duration_parts if h.endswith('s')][0][ : -1])
+            minutes = int([m for m in duration_parts if m.endswith('m')][0][ : -1])
+            seconds = int([s for s in duration_parts if s.endswith('s')][0][ : -1])
     
             activity_index = calculate_activity_index(dt.timedelta(hours = hours, minutes = minutes, seconds = seconds))
             await message.channel.send(f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
