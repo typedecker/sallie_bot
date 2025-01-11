@@ -149,10 +149,10 @@ large_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 25)
 small_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 15)
 
 voice_client = None
-currently_playing = None
-music_cmd_channel_id = None
-is_playing, is_paused = False, True
-music_queue = []
+# currently_playing = None
+# music_cmd_channel_id = None
+# is_playing, is_paused = False, True
+# music_queue = []
 
 messages_cache = []
 
@@ -1214,7 +1214,7 @@ async def on_message(message) :
                 start = end
             end += 1
             continue
-        if (end - start) != 0: parts.append(message.content[start : end]
+        if (end - start) != 0: parts.append(message.content[start : end])
 
         # Prepares and sends the messages in parts if needed, with the appropriate info annotated above it.
         msg_creation_time_str = message.created_at.strftime(datetime_date_format)
@@ -1319,59 +1319,59 @@ async def on_message(message) :
             audio_source = discord.FFmpegPCMAudio('temp_tts.mp3')
             if not voice_client.is_playing():
                 voice_client.play(audio_source, after = None)
-    if message.content.lower().startswith('$$m_play') :
-        subquery = message.content[len('$$m_play') : ].strip()
-        response_obj = search_yt(subquery)
-        music_queue.append(response_obj)
-        if len(music_queue) >= 1 :
-            if voice_client :
-                if voice_client.is_playing() :
-                    await message.channel.send('Added to queue the song named : {}'.format(response_obj['title']))
-        if voice_client :
-            if not voice_client.is_playing() :
-                response = play_next()
-                if not response : await message.channel.send('There were no more songs left in queue to play.')
-                else :
-                    await message.channel.send('Now playing: {}'.format(response['title']))
-        else :
-            if message.author.voice :
-                requested_vc = message.author.voice.channel
-                voice_client = await requested_vc.connect()
-                response = play_next()
-                if not response : await message.channel.send('There were no more songs left in queue to play.')
-                else :
-                    await message.channel.send('Now playing: {}'.format(response['title']))
-            else :
-                music_queue.pop(-1)
-                await message.channel.send('You are not in any VC! Join a VC to request a song.')
-    if message.content.lower() == '$$m_skip' :
-        if voice_client :
-            if voice_client.is_playing() :
-                if music_queue == 0 : currently_playing = None
-                voice_client.stop()
-                await message.channel.send('Skipped the current song.')
-                if currently_playing : await message.channel.send('Now playing: {}'.format(currently_playing['title']))
-        else :
-            if message.author.voice :
-                requested_vc = message.author.voice.channel
-                voice_client = await requested_vc.connect()
-                response = play_next()
-                if not response : await message.channel.send('There were no more songs left in queue to play.')
-                else :
-                    await message.channel.send('Now playing: {}'.format(response['title']))
-                await message.channel.send('Skipped the current song.')
-            else :
-                await message.channel.send('You are not in any VC! Join a VC to request a song.')
-    if message.content.lower() == '$$m_pause' :
-        if voice_client and not voice_client.is_paused() : voice_client.pause()
-        await message.channel.send('Paused the current song.')
-    if message.content.lower() == '$$m_unpause' or message.content.lower() == '$$m_resume' :
-        if voice_client and voice_client.is_paused() : voice_client.resume()
-        await message.channel.send('Resumed the current song.')
-    if message.content.lower() == '$$m_queue' :
-        queue_str = '\n'.join([str(i + 1) + '. ' + k['title'] for i, k in enumerate(music_queue)])
-        if currently_playing : await message.channel.send('```\nQUEUE\n \nCurrently Playing: {0}\n \n{1}\n```'.format(currently_playing['title'], queue_str))
-        else : await message.channel.send('```\nQUEUE\n \nCurrently Playing: Nothing\n \n{}\n```'.format(queue_str))
+    # if message.content.lower().startswith('$$m_play') :
+    #     subquery = message.content[len('$$m_play') : ].strip()
+    #     response_obj = search_yt(subquery)
+    #     music_queue.append(response_obj)
+    #     if len(music_queue) >= 1 :
+    #         if voice_client :
+    #             if voice_client.is_playing() :
+    #                 await message.channel.send('Added to queue the song named : {}'.format(response_obj['title']))
+    #     if voice_client :
+    #         if not voice_client.is_playing() :
+    #             response = play_next()
+    #             if not response : await message.channel.send('There were no more songs left in queue to play.')
+    #             else :
+    #                 await message.channel.send('Now playing: {}'.format(response['title']))
+    #     else :
+    #         if message.author.voice :
+    #             requested_vc = message.author.voice.channel
+    #             voice_client = await requested_vc.connect()
+    #             response = play_next()
+    #             if not response : await message.channel.send('There were no more songs left in queue to play.')
+    #             else :
+    #                 await message.channel.send('Now playing: {}'.format(response['title']))
+    #         else :
+    #             music_queue.pop(-1)
+    #             await message.channel.send('You are not in any VC! Join a VC to request a song.')
+    # if message.content.lower() == '$$m_skip' :
+    #     if voice_client :
+    #         if voice_client.is_playing() :
+    #             if music_queue == 0 : currently_playing = None
+    #             voice_client.stop()
+    #             await message.channel.send('Skipped the current song.')
+    #             if currently_playing : await message.channel.send('Now playing: {}'.format(currently_playing['title']))
+    #     else :
+    #         if message.author.voice :
+    #             requested_vc = message.author.voice.channel
+    #             voice_client = await requested_vc.connect()
+    #             response = play_next()
+    #             if not response : await message.channel.send('There were no more songs left in queue to play.')
+    #             else :
+    #                 await message.channel.send('Now playing: {}'.format(response['title']))
+    #             await message.channel.send('Skipped the current song.')
+    #         else :
+    #             await message.channel.send('You are not in any VC! Join a VC to request a song.')
+    # if message.content.lower() == '$$m_pause' :
+    #     if voice_client and not voice_client.is_paused() : voice_client.pause()
+    #     await message.channel.send('Paused the current song.')
+    # if message.content.lower() == '$$m_unpause' or message.content.lower() == '$$m_resume' :
+    #     if voice_client and voice_client.is_paused() : voice_client.resume()
+    #     await message.channel.send('Resumed the current song.')
+    # if message.content.lower() == '$$m_queue' :
+    #     queue_str = '\n'.join([str(i + 1) + '. ' + k['title'] for i, k in enumerate(music_queue)])
+    #     if currently_playing : await message.channel.send('```\nQUEUE\n \nCurrently Playing: {0}\n \n{1}\n```'.format(currently_playing['title'], queue_str))
+    #     else : await message.channel.send('```\nQUEUE\n \nCurrently Playing: Nothing\n \n{}\n```'.format(queue_str))
     if message.content.lower().startswith('$$lb ') :
         lb_type = message.content.lower()[len('$$lb ') : ]
         lb_data = fetch_counter_data(lb_type)
