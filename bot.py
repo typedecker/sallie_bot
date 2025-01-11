@@ -104,7 +104,7 @@ HELP_DICT = {
             'level': ['$$level @member', 'Alias for $$rank, Sends back a rank card for the member pinged, if no user is pinged it sends the rank card for the command user.'],
             'website': ['$$website', 'Displays the URL for the home page of the server website!'],
             'server_website': ['$$server_website', 'Alias for $$website, displays the URL for the homepage of the server website!'],
-            'activity_index': ['$$activity_index <hours>h <minutes>m <seconds>s', 'Looks back into it\'s message cache as queried by the user, using the lookback duration arguments, and calculates the activity index.',
+            'activity_index': ['$$activity_index <hours>h <minutes>m <seconds>s', 'Looks back into it\'s message cache as queried by the user, using the lookback duration arguments, and calculates the activity index.'],
             'boost[ADMIN ONLY]': ['$$boost @booster', 'Updates the database to store the pinged member as a booster.[ADMIN ONLY]'],
             'echo[ADMIN ONLY]': ['$$echo #channel-mention <content>', 'Sends a message with the content specified, in the channel mentioned.[ADMIN ONLY]'],
             'echo_dm[ADMIN ONLY]': ['$$echo_dm @member-mention <content>', 'Sends a message with the content specified, in the dms of the member mentioned.[ADMIN ONLY]'],
