@@ -71,7 +71,7 @@ _Task_Class.__del__ = _patched_del
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
-CACHE_RETENTION_TIME = 1 # 1 day[in days]
+ = 1 # 1 day[in days]
 SPAM_CHANNEL_ID = 1245681028178251818
 AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
 CONFESSION_CHANNEL_ID = 1239309061585899572
@@ -1271,7 +1271,7 @@ async def on_message(message) :
         if message.guild.id == PET_OWNER_GUILD :
             activity_index_cache_entry = [[calculate_activity_index(dt.timedelta(hours = 1)), calculate_activity_index(dt.timedelta(minutes = 1)), calculate_activity_index(dt.timedelta(seconds = 1))], get_datetime_str(message.created_at)]
             activity_index_cache.append(activity_index_cache_entry)
-    activity_index_cache = [cache_entry for cache_entry in activity_index_cache if get_datetime_obj(cache_entry[1]) < (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_TIME)).replace(tzinfo = dt.UTC)]
+    activity_index_cache = [cache_entry for cache_entry in activity_index_cache if datetime.now(dt.UTC) >= get_datetime_obj(cache_entry[1]) >= (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_TIME)).replace(tzinfo = dt.UTC)]
         
     if message.content.lower() == '$$ping' :
         await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
