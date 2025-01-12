@@ -18,12 +18,13 @@ from gtts import gTTS
 from flask import Flask, render_template, redirect, url_for, request, make_response, session
 from datetime import datetime
 from threading import Thread
-from yt_dlp import YoutubeDL
+# from yt_dlp import YoutubeDL
 from markupsafe import escape
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 import datetime as dt
 import ratelimit_handler as rh
+import matplotlib.pyplot as plt
 
 # ---
 os.environ['PATH'] = os.environ['PATH'] + ';' + os.path.abspath('assets')
@@ -70,6 +71,7 @@ _Task_Class.__del__ = _patched_del
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
+CACHE_RETENTION_TIME = 1 # 1 day[in days]
 SPAM_CHANNEL_ID = 1245681028178251818
 AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
 CONFESSION_CHANNEL_ID = 1239309061585899572
@@ -91,12 +93,6 @@ HELP_DICT = {
             'vc_connect': ['$$vc_connect', 'Connects to the same VC as the user who executed the command.'],
             'vc_disconnect': ['$$vc_disconnect', 'Disconnects from any VC that she might be in.'],
             'tts' : ['$$tts <message>', 'Converts the message from text to speech and plays it in VC.'],
-            # 'm_play': ['$$m_play <query>', 'Searches for the query provided and plays it if it founds anything similar. If a song is already playing the new song will be added to the queue.'],
-            # 'm_queue': ['$$m_queue', 'Displays the queue of songs'],
-            # 'm_skip': ['$$m_skip', 'Skips the song currently being played, if any.'],
-            # 'm_pause': ['$$m_pause', 'Pauses the song.'],
-            # 'm_resume': ['$$m_resume', 'Resumes the song.'],
-            # 'm_unpause': ['$$m_unpause', 'Alias for $$m_resume, resumes/unpauses the song.'],
             'lb': ['$$lb <counter-type:slap|bump|welcome|boost|levels>', 'Displays the leaderboards for the given counter-type.'],
             'revive': ['$$revive @person1 @person2 ...', 'Sends a sweet revival message to whoever is pinged in their DMs.'],
             'my_discord_id': ['$$my_discord_id', 'Displays the user\'s discord id. Can be used for logging into the website!'],
@@ -105,6 +101,8 @@ HELP_DICT = {
             'website': ['$$website', 'Displays the URL for the home page of the server website!'],
             'server_website': ['$$server_website', 'Alias for $$website, displays the URL for the homepage of the server website!'],
             'activity_index': ['$$activity_index <hours>h <minutes>m <seconds>s', 'Looks back into it\'s message cache as queried by the user, using the lookback duration arguments, and calculates the activity index.'],
+            'activity_chart': ['$$activity_chart <mode: h/m/s> {optional -g tag for grid enabling} <hours>h <minutes>m <seconds>s', 'Generates a chart based on the cached activity index for the given specifications.'],
+            'activity_graph': ['$$activity_graph <mode: h/m/s> {optional -g tag for grid enabling} <hours>h <minutes>m <seconds>s', 'Alias for $$activity_chart, Generates a graph based on the cached activity index for the given specifications.'],
             'boost[ADMIN ONLY]': ['$$boost @booster', 'Updates the database to store the pinged member as a booster.[ADMIN ONLY]'],
             'echo[ADMIN ONLY]': ['$$echo #channel-mention <content>', 'Sends a message with the content specified, in the channel mentioned.[ADMIN ONLY]'],
             'echo_dm[ADMIN ONLY]': ['$$echo_dm @member-mention <content>', 'Sends a message with the content specified, in the dms of the member mentioned.[ADMIN ONLY]'],
@@ -112,7 +110,7 @@ HELP_DICT = {
             'echo_react[ADMIN ONLY]': ['$$echo_react #channel-mention <message-id> <emoji>', 'Reacts to the message corresponding the message id specified, with the reaction provided, in the channel mentioned.[ADMIN ONLY]'],
             }
 
-YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
+# YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
 FFMPEG_OPTIONS = {'before_options' : '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options' : '-vn'}
 
 # -------
@@ -154,7 +152,8 @@ voice_client = None
 # is_playing, is_paused = False, True
 # music_queue = []
 
-messages_cache = []
+# messages_cache = []
+activity_index_cache = []
 
 LEVELUP_TIMES = {}
 
@@ -355,42 +354,42 @@ async def on_raw_member_remove(member) :
 
 # ---------------------------------------------------------------------------------
 
-def search_yt(item):
-    global YDL_OPTIONS
+# def search_yt(item):
+#     global YDL_OPTIONS
     
-    with YoutubeDL(YDL_OPTIONS) as ydl :
-        try: 
-            info = ydl.extract_info("ytsearch:%s" % item, download = False)['entries'][0]
-        except Exception: 
-            return False
-    return {'source': info['url'], 'title': info['title']}
+#     with YoutubeDL(YDL_OPTIONS) as ydl :
+#         try: 
+#             info = ydl.extract_info("ytsearch:%s" % item, download = False)['entries'][0]
+#         except Exception: 
+#             return False
+#     return {'source': info['url'], 'title': info['title']}
 
-async def display_currently_playing_song() :
-    global client, currently_playing, music_cmd_channel_id
+# async def display_currently_playing_song() :
+#     global client, currently_playing, music_cmd_channel_id
     
-    if not music_cmd_channel_id or currently_playing : return
+#     if not music_cmd_channel_id or currently_playing : return
     
-    music_channel = await client.fetch_channel(music_cmd_channel_id)
-    await music_channel.send('[uwu]Now playing: {}'.format(currently_playing['title']))
+#     music_channel = await client.fetch_channel(music_cmd_channel_id)
+#     await music_channel.send('[uwu]Now playing: {}'.format(currently_playing['title']))
     
-    return
+#     return
 
-def play_next() :
-    global bot, voice_client, music_queue, is_playing, is_paused, currently_playing
+# def play_next() :
+#     global bot, voice_client, music_queue, is_playing, is_paused, currently_playing
     
-    is_playing = True
-    if len(music_queue) > 0 :
-        response_obj = music_queue.pop(0)
-        print(response_obj)
-        m_url, song_title = response_obj['source'], response_obj['title']
-        voice_client.play(discord.FFmpegPCMAudio(m_url, **FFMPEG_OPTIONS), after = lambda x : play_next())
-        currently_playing = response_obj.copy()
-        asyncio.create_task(display_currently_playing_song())
-        return response_obj
-    else :
-        currently_playing = None
-        return None
-    return
+#     is_playing = True
+#     if len(music_queue) > 0 :
+#         response_obj = music_queue.pop(0)
+#         print(response_obj)
+#         m_url, song_title = response_obj['source'], response_obj['title']
+#         voice_client.play(discord.FFmpegPCMAudio(m_url, **FFMPEG_OPTIONS), after = lambda x : play_next())
+#         currently_playing = response_obj.copy()
+#         asyncio.create_task(display_currently_playing_song())
+#         return response_obj
+#     else :
+#         currently_playing = None
+#         return None
+#     return
 
 # ---------------------------------------------------------------------------------
 
@@ -1160,10 +1159,10 @@ async def welcome_count_check(message) :
     await message.add_reaction(emoji)
     return
 
-def calculate_activity_index(lookback_duration) :
+def calculate_activity_index(lookback_duration: dt.timedelta) -> int :
     # If messages cache is empty then return.
-    if len(messages_cache) == 0: return
-    messages_cache_objs = [get_datetime_obj(ds) for ds in messages_cache]
+    if len(activity_index_cache) == 0: return 0.0
+    messages_cache_objs = [get_datetime_obj(ds) for old_ac_in, ds in activity_index_cache]
 
     now_time = datetime.now(dt.UTC)
     relevant_objs = [obj for obj in messages_cache_objs if (now_time - lookback_duration) <= obj <= now_time]
@@ -1171,6 +1170,40 @@ def calculate_activity_index(lookback_duration) :
     time = lookback_duration.total_seconds() / 30 # 30 seconds as the minimum unit of time measurement.
     activity_index = (len(relevant_objs) / time) # Number of messages per unit time.
     return activity_index
+
+def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = False) :
+    # Mode can be h/m/s aka hours/minutes/seconds
+    if mode not in 'hms': return None # If invalid mode provided return No graph.
+    mode_index = 'hms'.index(mode) # Get a mode_index instead of a string, better for usage in indexing stuff.
+    
+    if len(activity_index_cache) == 0: return None # If no cache has been stored yet, return None.
+    pass
+
+    x_vals, y_vals = [], []
+    for activity_indices, datetime_str in activity_index_cache :
+        datetime_obj = get_datetime_obj(datetime_str)
+        if not ((datetime.now(dt.UTC) - lookback_duration).replace(tzinfo = dt.UTC) < datetime_obj < datetime.now(dt.UTC)): break
+        x_vals.append(datetime_obj.strftime('%H:%M:%S'))
+        y_vals.append(activity_indices[mode_index])
+        continue
+    
+    # Plotting
+    plt.figure(figsize = (10, 6))
+    plt.plot(x_vals, y_vals, marker = '.', linestyle = '-', color = 'orange')
+    
+    # Label the x-axis and y-axis
+    plt.xlabel("Time")
+    plt.ylabel('Activity Index')
+    plt.title("Activity Chart")
+    plt.grid(grid)
+    plt.tight_layout()  # Adjust layout for better fit
+
+    # Save the plot to an in-memory buffer
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)  # Reset buffer position
+    plt.close()  # Close the plot to free memory
+    return buffer
 
 @bot.event
 async def on_message(message) :
@@ -1233,7 +1266,9 @@ async def on_message(message) :
     # await run_defamer_check()
     if message.channel.type != discord.ChannelType.private and message.author.id != BOT_SELF_USER_ID and (not message.author.bot) :
         if message.guild.id == PET_OWNER_GUILD :
-            messages_cache.append(get_datetime_str(message.created_at))
+            activity_index_cache_entry = [[calculate_activity_index(dt.timedelta(hours = 1)), calculate_activity_index(dt.timedelta(minutes = 1)), calculate_activity_index(dt.timedelta(seconds = 1))], get_datetime_str(message.created_at)]
+            activity_index_cache.append(activity_index_cache_entry)
+    activity_index_cache = [cache_entry for cache_entry in activity_index_cache if get_datetime_obj(cache_entry[1]) < (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_TIME)).replace(tzinfo = dt.UTC)]
         
     if message.content.lower() == '$$ping' :
         await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
@@ -1320,59 +1355,6 @@ async def on_message(message) :
             audio_source = discord.FFmpegPCMAudio('temp_tts.mp3')
             if not voice_client.is_playing():
                 voice_client.play(audio_source, after = None)
-    # if message.content.lower().startswith('$$m_play') :
-    #     subquery = message.content[len('$$m_play') : ].strip()
-    #     response_obj = search_yt(subquery)
-    #     music_queue.append(response_obj)
-    #     if len(music_queue) >= 1 :
-    #         if voice_client :
-    #             if voice_client.is_playing() :
-    #                 await message.channel.send('Added to queue the song named : {}'.format(response_obj['title']))
-    #     if voice_client :
-    #         if not voice_client.is_playing() :
-    #             response = play_next()
-    #             if not response : await message.channel.send('There were no more songs left in queue to play.')
-    #             else :
-    #                 await message.channel.send('Now playing: {}'.format(response['title']))
-    #     else :
-    #         if message.author.voice :
-    #             requested_vc = message.author.voice.channel
-    #             voice_client = await requested_vc.connect()
-    #             response = play_next()
-    #             if not response : await message.channel.send('There were no more songs left in queue to play.')
-    #             else :
-    #                 await message.channel.send('Now playing: {}'.format(response['title']))
-    #         else :
-    #             music_queue.pop(-1)
-    #             await message.channel.send('You are not in any VC! Join a VC to request a song.')
-    # if message.content.lower() == '$$m_skip' :
-    #     if voice_client :
-    #         if voice_client.is_playing() :
-    #             if music_queue == 0 : currently_playing = None
-    #             voice_client.stop()
-    #             await message.channel.send('Skipped the current song.')
-    #             if currently_playing : await message.channel.send('Now playing: {}'.format(currently_playing['title']))
-    #     else :
-    #         if message.author.voice :
-    #             requested_vc = message.author.voice.channel
-    #             voice_client = await requested_vc.connect()
-    #             response = play_next()
-    #             if not response : await message.channel.send('There were no more songs left in queue to play.')
-    #             else :
-    #                 await message.channel.send('Now playing: {}'.format(response['title']))
-    #             await message.channel.send('Skipped the current song.')
-    #         else :
-    #             await message.channel.send('You are not in any VC! Join a VC to request a song.')
-    # if message.content.lower() == '$$m_pause' :
-    #     if voice_client and not voice_client.is_paused() : voice_client.pause()
-    #     await message.channel.send('Paused the current song.')
-    # if message.content.lower() == '$$m_unpause' or message.content.lower() == '$$m_resume' :
-    #     if voice_client and voice_client.is_paused() : voice_client.resume()
-    #     await message.channel.send('Resumed the current song.')
-    # if message.content.lower() == '$$m_queue' :
-    #     queue_str = '\n'.join([str(i + 1) + '. ' + k['title'] for i, k in enumerate(music_queue)])
-    #     if currently_playing : await message.channel.send('```\nQUEUE\n \nCurrently Playing: {0}\n \n{1}\n```'.format(currently_playing['title'], queue_str))
-    #     else : await message.channel.send('```\nQUEUE\n \nCurrently Playing: Nothing\n \n{}\n```'.format(queue_str))
     if message.content.lower().startswith('$$lb ') :
         lb_type = message.content.lower()[len('$$lb ') : ]
         lb_data = fetch_counter_data(lb_type)
@@ -1486,24 +1468,71 @@ async def on_message(message) :
     if message.content.lower().startswith('$$activity_index ') :
         try :
             duration = message.content.lower()[len('$$activity_index ') : ]
-            duration_parts = duration.strip().split(' ') + ['0h', '0m', '1s']
-            
-            hours = int([h for h in duration_parts if h.endswith('h')][0][ : -1])
-            minutes = int([m for m in duration_parts if m.endswith('m')][0][ : -1])
-            seconds = int([s for s in duration_parts if s.endswith('s')][0][ : -1])
+            duration_parts = duration.strip().split(' ')
+
+            if duration_parts == [] :
+                await message.channel.send('Proper lookback duration has not been provided for calculation of activity index.')
+            else :
+                hour_instances = [h for h in duration_parts if h.endswith('h')]
+                min_instances = [m for m in duration_parts if m.endswith('m')]
+                sec_instances = [s for s in duration_parts if s.endswith('s')]
     
-            activity_index = calculate_activity_index(dt.timedelta(hours = hours, minutes = minutes, seconds = seconds))
-            await message.channel.send(f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
+                hours = int(hour_instances[0][ : -1]) if hour_instances else 0.0
+                minutes = int(min_instances[0][ : -1]) if min_instances else 0.0
+                seconds = int(sec_instances[0][ : -1]) if sec_instances else 0.0
+    
+                # if hours == minutes == seconds == 0.0 :
+                #     await message.channel.send('Proper lookback duration has not been provided for calculation of activity index.')
+                # else :
+                activity_index = calculate_activity_index(dt.timedelta(hours = hours, minutes = minutes, seconds = seconds))
+                await message.channel.send(f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
         except ValueError as e:
             print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-            print(e)
-    
+            await message.channel.send('Command syntax was not followed and the lookback duration arguments were not integers. Try again.')
+    if message.content.lower().startswith('$$activity_graph ') or message.content.lower().startswith('$$activity_chart ') :
+        args = message.content.lower()[len('$$activity_graph ') : ].strip().split(' ')
+        if len(args) < 2 :
+            await message.channel.send('Arguments not passed properly to the command, to generate an activity chart, I need the chart mode and lookback duration!! <33 Please try again~')
+        else :
+            mode = args[0]
+            mode_aliases = {'h': ['hr', 'hrs', 'hour', 'hours'], 'm': ['min', 'mins', 'minute', 'minutes'], 's': ['sec', 'secs', 'second', 'seconds']}
+            for mode_main in mode_aliases :
+                if mode in mode_aliases[mode_main] :
+                    mode = mode_main
+                    break
+                continue
+            if mode not in 'hms':
+                await message.channel.send('ERMM... WHAT THE SIGMA~ You passed an invalid mode type sweetheart 😊✨!')
+            else :
+                grid_bool = ([arg == '-g' for arg in args[1 : ] if arg == '-g'] or [False])[0]
+                duration_parts = args[1 : ]
+                if duration_parts == [] :
+                    await message.channel.send('Proper lookback duration has not been provided for plotting of the activity chart.')
+                else :
+                    hour_instances = [h for h in duration_parts if h.endswith('h')]
+                    min_instances = [m for m in duration_parts if m.endswith('m')]
+                    sec_instances = [s for s in duration_parts if s.endswith('s')]
+        
+                    hours = int(hour_instances[0][ : -1]) if hour_instances else 0.0
+                    minutes = int(min_instances[0][ : -1]) if min_instances else 0.0
+                    seconds = int(sec_instances[0][ : -1]) if sec_instances else 0.0
+
+                    lookback_duration = dt.timedelta(hours = hours, minutes = minutes, seconds = seconds)
+                    activity_chart_buffer = generate_activity_graph(lookback_duration, mode, grid_bool)
+
+                    # Create a Discord file from the buffer
+                    chart_file = discord.File(activity_chart_buffer, filename = 'graph.png')
+                
+                    # Create an embed with the graph
+                    embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT),
+                                          title = 'Activity Chart',
+                                          description = 'Given below is the activity chart generated for the provided specifications')
+                    embed.set_image(url = "attachment://graph.png")
+                
+                    # Send the embed with the attached graph
+                    await message.channel.send(file = chart_file, embed = embed)
+                    pass
+
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
         if message.author.id in LEVELUP_TIMES :
