@@ -1207,7 +1207,7 @@ def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = F
 
 @bot.event
 async def on_message(message) :
-    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, messages_cache
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, activity_index_cache
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
