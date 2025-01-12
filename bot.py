@@ -5,8 +5,8 @@ Created on Tue May 21 20:02:05 2024
 @author: ketch
 """
 
-# ENVIRONMENT_TYPE = 'DEV'
-ENVIRONMENT_TYPE = 'PROD'
+ENVIRONMENT_TYPE = 'DEV'
+# ENVIRONMENT_TYPE = 'PROD'
 print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 
 import nest_asyncio
@@ -108,6 +108,7 @@ HELP_DICT = {
             'echo_dm[ADMIN ONLY]': ['$$echo_dm @member-mention <content>', 'Sends a message with the content specified, in the dms of the member mentioned.[ADMIN ONLY]'],
             'echo_reply[ADMIN ONLY]': ['$$echo_reply #channel-mention <message-id> <content>', 'Replies to the message corresponding the message id specified, with the content specified, in the channel mentioned.[ADMIN ONLY]'],
             'echo_react[ADMIN ONLY]': ['$$echo_react #channel-mention <message-id> <emoji>', 'Reacts to the message corresponding the message id specified, with the reaction provided, in the channel mentioned.[ADMIN ONLY]'],
+            'debug_val[ADMIN ONLY]': ['$$debug_val <variable-name>', 'Displays the current value of the variable within the running code, if the variable exists in it, if it doesn\'t then notifies the same.']
             }
 
 # YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
@@ -1161,6 +1162,8 @@ async def welcome_count_check(message) :
 
 def calculate_activity_index(lookback_duration: dt.timedelta) -> int :
     # If messages cache is empty then return.
+    global activity_index_cache
+    print(lookback_duration, activity_index_cache)
     if len(activity_index_cache) == 0: return 0.0
     messages_cache_objs = [get_datetime_obj(ds) for old_ac_in, ds in activity_index_cache]
 
@@ -1532,7 +1535,13 @@ async def on_message(message) :
                     # Send the embed with the attached graph
                     await message.channel.send(file = chart_file, embed = embed)
                     pass
-
+    if message.content.lower().startswith('$$debug_val ') :
+        arg = message.content[len('$$debug_val ') : ]
+        if arg not in globals() :
+            await message.channel.send('Invalid variable queried, not available in globals.')
+        else :
+            await message.channel.send(f'```py\n{globals()[arg]}```')
+    
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
         if message.author.id in LEVELUP_TIMES :
