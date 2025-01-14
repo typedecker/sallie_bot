@@ -72,7 +72,7 @@ datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
 CACHE_RETENTION_DURATION = 1 # 1 day[in days]
 ACTIVITY_INDEX_DB_CACHING_DURATION = 1 # 1 hour[in hours]
-STATUS_ROTATION_TIME = 10 # 10 mins[in minutes]
+STATUS_ROTATION_DURATION = 10 # 10 mins[in minutes]
 DESIRED_TICK_NUM = 10
 BOT_STATUSES = ['Getting Slapped by the slappers!', # OG message!
                 'Being taught cuteness and good manners by mama cc~ ✨😊🌸!', # CC
