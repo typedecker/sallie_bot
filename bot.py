@@ -5,8 +5,8 @@ Created on Tue May 21 20:02:05 2024
 @author: ketch
 """
 
-# ENVIRONMENT_TYPE = 'DEV'
-ENVIRONMENT_TYPE = 'PROD'
+ENVIRONMENT_TYPE = 'DEV'
+# ENVIRONMENT_TYPE = 'PROD'
 print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 
 import nest_asyncio
@@ -18,7 +18,6 @@ from gtts import gTTS
 from flask import Flask, render_template, redirect, url_for, request, make_response, session
 from datetime import datetime
 from threading import Thread
-# from yt_dlp import YoutubeDL
 from markupsafe import escape
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -71,7 +70,23 @@ _Task_Class.__del__ = _patched_del
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
-CACHE_RETENTION_TIME = 1 # 1 day[in days]
+CACHE_RETENTION_DURATION = 1 # 1 day[in days]
+ACTIVITY_INDEX_DB_CACHING_DURATION = 1 # 1 hour[in hours]
+STATUS_ROTATION_TIME = 10 # 10 mins[in minutes]
+DESIRED_TICK_NUM = 10
+BOT_STATUSES = ['Getting Slapped by the slappers!', # OG message!
+                'Being taught cuteness and good manners by mama cc~ ✨😊🌸!', # CC
+                'Drinking beer and getting horny with aya auntie~~ ehe :3 🍻', # AYA
+                'Having fun learning how to code from dada adi 🧡💻!!', # ME
+                'Learning how to be an alpha and an ekitten at the same time, thanks to my cute emilie auntie 🩷!!!', # Alpha Ekitten
+                'Tearing off people\'s diapers and learning the ways of sexting with diapaking himself~! 🩲', # Diapaking
+                'Sipping some good ol\' coffee with my lovely old granny aunt dex 💜~', # Dex
+                'Grinding some demons on geometry dash, yesh! yesh! Dada taught me hehe~', # GD Reference
+                'Woosh! if you read this, may you have an awesome day, mwah! 🦎', # Random cute status
+                'Listening to some linkin park songs with auntie liv ❤️, shes so hot!!', # LIV
+                'Reading some books reawwy carefully with reading ekitten in da slapping salamanders serva library~! 💛', # Reading Ekitten
+                'Giving tons of huggies to rat auntie as I hold her hand and guide her way through the tough times~! 💙', # RAT
+              ]
 SPAM_CHANNEL_ID = 1245681028178251818
 AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
 CONFESSION_CHANNEL_ID = 1239309061585899572
@@ -108,10 +123,10 @@ HELP_DICT = {
             'echo_dm[ADMIN ONLY]': ['$$echo_dm @member-mention <content>', 'Sends a message with the content specified, in the dms of the member mentioned.[ADMIN ONLY]'],
             'echo_reply[ADMIN ONLY]': ['$$echo_reply #channel-mention <message-id> <content>', 'Replies to the message corresponding the message id specified, with the content specified, in the channel mentioned.[ADMIN ONLY]'],
             'echo_react[ADMIN ONLY]': ['$$echo_react #channel-mention <message-id> <emoji>', 'Reacts to the message corresponding the message id specified, with the reaction provided, in the channel mentioned.[ADMIN ONLY]'],
-            'debug_val[ADMIN ONLY]': ['$$debug_val <variable-name>', 'Displays the current value of the variable within the running code, if the variable exists in it, if it doesn\'t then notifies the same.']
+            'debug_get[ADMIN ONLY]': ['$$debug_get <variable-name>', 'Displays the current value of the variable within the running code, if the variable exists in it, if it doesn\'t then notifies the same.'],
+            'debug_set[ADMIN ONLY]': ['$$debug_set <variable-name>=<value>', 'Sets the value of the mentioned global variable to the provided value, USE WITH IMMENSE CAUTION.'],
             }
 
-# YDL_OPTIONS = {'format' : 'bestaudio', 'noplaylist' : 'True', 'outtmpl' : 'temp_music.%(ext)s'}
 FFMPEG_OPTIONS = {'before_options' : '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options' : '-vn'}
 
 # -------
@@ -148,15 +163,11 @@ large_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 25)
 small_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 15)
 
 voice_client = None
-# currently_playing = None
-# music_cmd_channel_id = None
-# is_playing, is_paused = False, True
-# music_queue = []
-
-# messages_cache = []
 activity_index_cache = []
-
+activity_index_db_upload_time = datetime.now(dt.UTC)
 LEVELUP_TIMES = {}
+status_rotation_time = datetime.now(dt.UTC)
+current_bot_status = BOT_STATUSES[0]
 
 get_summation_func = lambda func : lambda x : sum([func(k) for k in range(x + 1)])
 level_func = lambda x : (5 * (x ** 2)) + (50 * x) + 100
@@ -262,10 +273,13 @@ async def bot_updatation() :
 
 @bot.event
 async def on_ready() :
-    global BOT_OWNER_ID, BOT_READY, BOT_START_TIME
-    
-    bot_activity = discord.Game(name = 'Getting Slapped by the slappers!', start = bot.user.created_at)
+    global BOT_OWNER_ID, BOT_READY, BOT_START_TIME, activity_index_cache, activity_index_db_upload_time, current_bot_status, status_rotation_time
+
+    current_bot_status = BOT_STATUSES[0]
+    bot_activity = discord.Game(name = current_bot_status, start = bot.user.created_at)
     await bot.change_presence(activity = bot_activity)
+
+    status_rotation_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(minutes = STATUS_ROTATION_DURATION))
     
     print('[LOG] Beam me up scotty ;)')
     
@@ -281,6 +295,10 @@ async def on_ready() :
         bot_updatation.start()
     
     await sync_db_invite_cache()
+
+    # Syncing activity_index_cache
+    activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val()
+    activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
     
     BOT_READY = True
     BOT_START_TIME = datetime.now(dt.UTC)
@@ -352,48 +370,6 @@ async def on_member_join(member) :
 async def on_raw_member_remove(member) :
     # remove all their data from the database.
     return
-
-# ---------------------------------------------------------------------------------
-
-# def search_yt(item):
-#     global YDL_OPTIONS
-    
-#     with YoutubeDL(YDL_OPTIONS) as ydl :
-#         try: 
-#             info = ydl.extract_info("ytsearch:%s" % item, download = False)['entries'][0]
-#         except Exception: 
-#             return False
-#     return {'source': info['url'], 'title': info['title']}
-
-# async def display_currently_playing_song() :
-#     global client, currently_playing, music_cmd_channel_id
-    
-#     if not music_cmd_channel_id or currently_playing : return
-    
-#     music_channel = await client.fetch_channel(music_cmd_channel_id)
-#     await music_channel.send('[uwu]Now playing: {}'.format(currently_playing['title']))
-    
-#     return
-
-# def play_next() :
-#     global bot, voice_client, music_queue, is_playing, is_paused, currently_playing
-    
-#     is_playing = True
-#     if len(music_queue) > 0 :
-#         response_obj = music_queue.pop(0)
-#         print(response_obj)
-#         m_url, song_title = response_obj['source'], response_obj['title']
-#         voice_client.play(discord.FFmpegPCMAudio(m_url, **FFMPEG_OPTIONS), after = lambda x : play_next())
-#         currently_playing = response_obj.copy()
-#         asyncio.create_task(display_currently_playing_song())
-#         return response_obj
-#     else :
-#         currently_playing = None
-#         return None
-#     return
-
-# ---------------------------------------------------------------------------------
-
 # --------------------------------------
 
 def fetch_counter_data(counter_type) :
@@ -1137,6 +1113,9 @@ async def welcome_count_check(message) :
         if message.content.isupper() :
             # +1 for being uppercase and excited!
             welcome_score += 1
+        if '!' in message.content :
+            # +1 for using exclamation marks :3
+            welcome_score += 1
 
         # scores the message for it's quickness after the joining of the member. adds a competitive sense to the whole thing.
         welcome_score += _welcome_calculate_decay_with_sharp_drop(time_diff)
@@ -1163,7 +1142,7 @@ async def welcome_count_check(message) :
 def calculate_activity_index(lookback_duration: dt.timedelta) -> int :
     # If messages cache is empty then return.
     global activity_index_cache
-    print(lookback_duration, activity_index_cache)
+    
     if len(activity_index_cache) == 0: return 0.0
     messages_cache_objs = [get_datetime_obj(ds) for old_ac_in, ds in activity_index_cache]
 
@@ -1186,13 +1165,17 @@ def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = F
     for activity_indices, datetime_str in activity_index_cache :
         datetime_obj = get_datetime_obj(datetime_str)
         if not ((datetime.now(dt.UTC) - lookback_duration).replace(tzinfo = dt.UTC) < datetime_obj < datetime.now(dt.UTC)): break
-        x_vals.append(datetime_obj.strftime('%H:%M:%S'))
+        x_vals.append(datetime_obj.strftime('%H:%M'))
         y_vals.append(activity_indices[mode_index])
         continue
     
     # Plotting
-    plt.figure(figsize = (10, 6))
+    plt.figure(figsize = (14, 10))
     plt.plot(x_vals, y_vals, marker = '.', linestyle = '-', color = 'orange')
+    
+    tick_ratio = max(1, math.floor(len(x_vals) / DESIRED_TICK_NUM))
+    selected_ticks = x_vals[ : : tick_ratio]  # Select every <tick-ratio>th point
+    plt.xticks(selected_ticks, [ds for ds in selected_ticks])
     
     # Label the x-axis and y-axis
     plt.xlabel("Time")
@@ -1210,7 +1193,7 @@ def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = F
 
 @bot.event
 async def on_message(message) :
-    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, music_queue, currently_playing, music_cmd_channel_id, is_playing, is_paused, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, activity_index_cache
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, activity_index_cache, CACHE_RETENTION_TIME, activity_index_db_upload_time, ACTIVITY_INDEX_DB_CACHING_DURATION, current_bot_status, BOT_STATUSES, status_rotation_time, STATUS_ROTATION_DURATION
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
@@ -1269,9 +1252,21 @@ async def on_message(message) :
     # await run_defamer_check()
     if message.channel.type != discord.ChannelType.private and message.author.id != BOT_SELF_USER_ID and (not message.author.bot) :
         if message.guild.id == PET_OWNER_GUILD :
-            activity_index_cache_entry = [[calculate_activity_index(dt.timedelta(hours = 1)), calculate_activity_index(dt.timedelta(minutes = 1)), calculate_activity_index(dt.timedelta(seconds = 1))], get_datetime_str(message.created_at)]
+            activity_index_cache_entry = [[calculate_activity_index(dt.timedelta(hours = 1)), calculate_activity_index(dt.timedelta(minutes = 1)), calculate_activity_index(dt.timedelta(seconds = 10))], get_datetime_str(message.created_at)]
             activity_index_cache.append(activity_index_cache_entry)
     activity_index_cache = [cache_entry for cache_entry in activity_index_cache if datetime.now(dt.UTC) >= get_datetime_obj(cache_entry[1]) >= (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_TIME)).replace(tzinfo = dt.UTC)]
+
+    # Updating the activity_index_cache value in db every hour.
+    if message.created_at.replace(tzinfo = dt.UTC) > get_datetime_obj(activity_index_db_upload_time) :
+        firebase_db_obj.child('activity_index_cache').set(activity_index_cache)
+        activity_index_db_upload_time = get_datetime_str(get_datetime_obj(activity_index_db_upload_time) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
+
+    # Rotating the bot status every 10 minutes.
+    if message.created_at.replace(tzinfo = dt.UTC) > get_datetime_obj(status_rotation_time) :
+        current_bot_status = random.choice([status for status in BOT_STATUSES if status != current_bot_status])
+        bot_activity = discord.Game(name = current_bot_status, start = bot.user.created_at)
+        await bot.change_presence(activity = bot_activity)
+        status_rotation_time = get_datetime_str(get_datetime_obj(status_rotation_time) + dt.timedelta(minutes = STATUS_ROTATION_DURATION))
         
     if message.content.lower() == '$$ping' :
         await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
@@ -1361,8 +1356,10 @@ async def on_message(message) :
     if message.content.lower().startswith('$$lb ') :
         lb_type = message.content.lower()[len('$$lb ') : ]
         lb_data = fetch_counter_data(lb_type)
-        
-        embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = f'{lb_type.title()} Leaderboards', description = f'Given below is the top 25 leaderboard for {lb_type}ing:')
+
+        verb = {'slap': 'slapping', 'bump': 'bumping', 'welcome': 'welcoming', 'level': 'levels/xp'}
+        embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = f'{lb_type.title()} Leaderboards',
+                              description = f'Given below is the top 25 leaderboard for {verb[lb_type]}:')
         
         rank = 1
         for member_name in sorted(lb_data, key = lb_data.get, reverse = True)[:25] :
@@ -1401,6 +1398,9 @@ async def on_message(message) :
     if message.content.lower().startswith('$$echo ') and message.author.id == BOT_OWNER_ID :
         try :
             content = ' '.join(message.content.split(' ')[2 : ])
+            if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
+                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                content = parent_msg.content
             channel = message.channel_mentions[0]
             await channel.send(f'{content}')
             await message.channel.send('Echoed successfully!')
@@ -1409,6 +1409,9 @@ async def on_message(message) :
     if message.content.lower().startswith('$$echo_dm') and message.author.id == BOT_OWNER_ID :
         try :
             content = ' '.join(message.content.split(' ')[2 : ])
+            if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
+                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                content = parent_msg.content
             mention = message.mentions[0]
             if mention != message.author : 
                 if mention.dm_channel == None :
@@ -1427,7 +1430,32 @@ async def on_message(message) :
         try :
             cmd_args = message.content.split(' ')
             content = ' '.join(cmd_args[3 : ])
+            if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
+                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                content = parent_msg.content
             channel = message.channel_mentions[0]
+            message_id = int(cmd_args[2])
+            
+            try :
+                msg = channel.get_partial_message(message_id)
+                await msg.reply(f'{content}')
+            except :
+                msg = await channel.fetch_message(message_id)
+                await msg.reply(f'{content}')
+
+            await message.channel.send('Reply sent successfully!')
+        except :
+            await message.channel.send('Something went wrong when trying to execute this command :<')
+    if message.content.lower().startswith('$$echo_dm_reply') and message.author.id == BOT_OWNER_ID :
+        # $$echo_dm_reply <mention> <message_id> <content>
+        try :
+            cmd_args = message.content.split(' ')
+            content = ' '.join(cmd_args[3 : ])
+            if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
+                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                content = parent_msg.content
+            mention = message.mentions[0]
+            channel = mention.dm_channel
             message_id = int(cmd_args[2])
             
             try :
@@ -1535,12 +1563,36 @@ async def on_message(message) :
                     # Send the embed with the attached graph
                     await message.channel.send(file = chart_file, embed = embed)
                     pass
-    if message.content.lower().startswith('$$debug_val ') :
-        arg = message.content[len('$$debug_val ') : ]
+    if message.content.lower().startswith('$$debug_get ') :
+        arg = message.content[len('$$debug_get ') : ]
         if arg not in globals() :
             await message.channel.send('Invalid variable queried, not available in globals.')
         else :
-            await message.channel.send(f'```py\n{globals()[arg]}```')
+            debug_val_content = f'{globals()[arg]}'
+            parts = []
+            start, end = 0, 0
+            while end < len(debug_val_content) :
+                if (end - start) >= 1900 :
+                    parts.append(debug_val_content[start : end])
+                    start = end
+                end += 1
+                continue
+            if (end - start) != 0: parts.append(message.content[start : end])
+
+            for part in parts :
+                await message.channel.send(f'```py\n{part}```')
+                continue
+    if message.content.lower().startswith('$$debug_set ') :
+        try :
+            arg = message.content[len('$$debug_set ') : ]
+            args = arg.split('=')
+            var_name = args[0].strip()
+            var_value = '='.join(args[1 : ])
+            globals()[var_name] = var_value
+            await message.channel.send(f'Global variable with the name {var_name} has been set to the value provided.')
+        except Exception as e :
+            print(e)
+            await message.channel.send('Something went wrong, could not set the variable globally. Try again or give up baby boy~')
     
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
