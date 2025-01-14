@@ -1165,13 +1165,13 @@ def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = F
     x_vals, y_vals = [], []
     for activity_indices, datetime_str in activity_index_cache :
         datetime_obj = get_datetime_obj(datetime_str)
-        if not ((datetime.now(dt.UTC) - lookback_duration).replace(tzinfo = dt.UTC) < datetime_obj < datetime.now(dt.UTC)): break
+        if not ((datetime.now(dt.UTC) - lookback_duration).replace(tzinfo = dt.UTC) < datetime_obj < datetime.now(dt.UTC)): continue
         x_vals.append(datetime_obj.strftime('%H:%M'))
         y_vals.append(activity_indices[mode_index])
         continue
     
     # Plotting
-    plt.figure(figsize = (14, 10))
+    plt.figure(figsize = (16.66, 10))
     plt.plot(x_vals, y_vals, marker = '.', linestyle = '-', color = 'orange')
     
     tick_ratio = max(1, math.floor(len(x_vals) / DESIRED_TICK_NUM))
