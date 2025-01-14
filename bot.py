@@ -1578,7 +1578,7 @@ async def on_message(message) :
                     start = end
                 end += 1
                 continue
-            if (end - start) != 0: parts.append(message.content[start : end])
+            if (end - start) != 0: parts.append(debug_val_content[start : end])
 
             for part in parts :
                 await message.channel.send(f'```py\n{part}```')
