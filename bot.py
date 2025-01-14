@@ -164,9 +164,7 @@ small_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 15)
 
 voice_client = None
 activity_index_cache = []
-activity_index_db_upload_time = datetime.now(dt.UTC)
 LEVELUP_TIMES = {}
-status_rotation_time = datetime.now(dt.UTC)
 current_bot_status = BOT_STATUSES[0]
 
 get_summation_func = lambda func : lambda x : sum([func(k) for k in range(x + 1)])
@@ -198,6 +196,9 @@ def get_datetime_str(do) :
 
 def get_datetime_obj(ds) :
     return datetime.strptime(ds, datetime_date_format).replace(tzinfo = dt.UTC)
+
+activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC))
+status_rotation_time = get_datetime_str(datetime.now(dt.UTC))
 
 async def fetch_invite_data(guild = None) :
     guild = guild or bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
