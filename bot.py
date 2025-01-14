@@ -298,7 +298,7 @@ async def on_ready() :
     await sync_db_invite_cache()
 
     # Syncing activity_index_cache
-    activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val()
+    activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val() or []
     activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
     
     BOT_READY = True
