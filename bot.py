@@ -92,6 +92,7 @@ AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
 CONFESSION_CHANNEL_ID = 1239309061585899572
 BOOSTER_NOTIF_CHANNEL_ID = 1269368301256179772
 SALLIE_DM_LOG_CHANNEL_ID = 1327052773673664605
+WELCOME_CHANNEL_ID = 1230972606690230272
 BOOSTER_TIER_ROLE_IDS = {'1': 1269733606432051210,
                          '2': 1269733728025055334,
                          '3': 1269733769619701902,
@@ -291,15 +292,15 @@ async def on_ready() :
         await bot_owner.dm_channel.send('Sallie the salamander has been deployed at {utc_time}'.format(utc_time = datetime.now(dt.UTC).strftime(datetime_date_format)))
     except :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
-    
-    if ENVIRONMENT_TYPE == 'PROD' :
-        bot_updatation.start()
-    
+
     await sync_db_invite_cache()
 
     # Syncing activity_index_cache
     activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val() or []
     activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
+    
+    if ENVIRONMENT_TYPE == 'PROD' :
+        bot_updatation.start()
     
     BOT_READY = True
     BOT_START_TIME = datetime.now(dt.UTC)
@@ -1077,6 +1078,9 @@ def _welcome_calculate_decay_with_sharp_drop(time_diff: dt.timedelta):
     return max(1.0, math.ceil(scale * math.exp(-sharp_decay_rate * adjusted_minutes)))
 
 async def welcome_count_check(message) :
+    global WELCOME_CHANNEL_ID
+    
+    if message.channel.id != WELCOME_CHANNEL_ID: return
     og_msg = (message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)) # Fetch the parent message for this reply message.
 
     # If the member who joined is also the one writing this message, then its not considered for point gain.
