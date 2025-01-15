@@ -5,8 +5,8 @@ Created on Tue May 21 20:02:05 2024
 @author: ketch
 """
 
-ENVIRONMENT_TYPE = 'DEV'
-# ENVIRONMENT_TYPE = 'PROD'
+# ENVIRONMENT_TYPE = 'DEV'
+ENVIRONMENT_TYPE = 'PROD'
 print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 
 import nest_asyncio
@@ -70,7 +70,7 @@ _Task_Class.__del__ = _patched_del
 
 datetime_date_format = '%a %d %b %Y, %I:%M:%S %p UTC time'
 SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
-CACHE_RETENTION_DURATION = 1 # 1 day[in days]
+CACHE_RETENTION_DURATION = 2 # 1 day[in days]
 ACTIVITY_INDEX_DB_CACHING_DURATION = 1 # 1 hour[in hours]
 STATUS_ROTATION_DURATION = 10 # 10 mins[in minutes]
 DESIRED_TICK_NUM = 10
@@ -1077,7 +1077,7 @@ def _welcome_calculate_decay_with_sharp_drop(time_diff: dt.timedelta):
     return max(1.0, math.ceil(scale * math.exp(-sharp_decay_rate * adjusted_minutes)))
 
 async def welcome_count_check(message) :
-    og_msg = await message.channel.fetch_message(message.reference.message_id) # Fetch the parent message for this reply message.
+    og_msg = (message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)) # Fetch the parent message for this reply message.
 
     # If the member who joined is also the one writing this message, then its not considered for point gain.
     if og_msg.author == message.author: return
