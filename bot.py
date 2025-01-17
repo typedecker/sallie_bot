@@ -74,6 +74,7 @@ CACHE_RETENTION_DURATION = 2 # 1 day[in days]
 ACTIVITY_INDEX_DB_CACHING_DURATION = 1 # 1 hour[in hours]
 STATUS_ROTATION_DURATION = 10 # 10 mins[in minutes]
 DESIRED_TICK_NUM = 10
+MESSAGE_CACHE_LIM = 10_000
 BOT_STATUSES = ['Getting Slapped by the slappers!', # OG message!
                 'Being taught cuteness and good manners by mama cc~ ✨😊🌸!', # CC
                 'Drinking beer and getting horny with aya auntie~~ ehe :3 🍻', # AYA
@@ -164,9 +165,10 @@ large_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 25)
 small_font = ImageFont.truetype(font = 'assets/arial.ttf', size = 15)
 
 voice_client = None
-activity_index_cache = []
 LEVELUP_TIMES = {}
 current_bot_status = BOT_STATUSES[0]
+recent_welcome_message = None
+recently_cached_messages = []
 
 get_summation_func = lambda func : lambda x : sum([func(k) for k in range(x + 1)])
 level_func = lambda x : (5 * (x ** 2)) + (50 * x) + 100
@@ -198,11 +200,12 @@ def get_datetime_str(do) :
 def get_datetime_obj(ds) :
     return datetime.strptime(ds, datetime_date_format).replace(tzinfo = dt.UTC)
 
-activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC))
+activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val() or []
+activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
 status_rotation_time = get_datetime_str(datetime.now(dt.UTC))
 
 async def fetch_invite_data(guild = None) :
-    guild = guild or bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
+    guild = (guild or bot.guilds[0]) if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD)))
     invites = await guild.invites()
     invite_data = {}
     for invite in invites :
@@ -215,7 +218,7 @@ async def fetch_invite_data(guild = None) :
 async def sync_db_invite_cache() :
     firebase_db_obj.child('invite_cache').child('empty').set({})
     
-    guild = bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
+    guild = bot.guilds[0] if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD)))
     invites = await guild.invites()
     
     for invite in invites :
@@ -249,7 +252,7 @@ async def review_ping_check(members) :
     print('[LOG] Review ping check is under way.')
     REVIEW_PING_CHANNEL_ID = 1242796180359086130
     
-    review_ping_channel = await bot.fetch_channel(REVIEW_PING_CHANNEL_ID)
+    review_ping_channel = [channel for channel in bot.guilds[0].text_channels if channel.id == REVIEW_PING_CHANNEL_ID][0] if bot.guilds else (await bot.fetch_channel(REVIEW_PING_CHANNEL_ID))
     for member in members :
         ratelimited_iteration = ratelimiter.handle(func = review_ping_check_iteration, default_rl = 1)
         await ratelimited_iteration(member, review_ping_channel)
@@ -264,8 +267,8 @@ async def bot_updatation() :
     # Called every 12 hours and does all the timed updatation that the bot needs.
     print('[LOG] Bot Updatation is under way.')
     
-    guild = await bot.fetch_guild(PET_OWNER_GUILD)
-    members = [member async for member in guild.fetch_members()]
+    guild = bot.guilds[0] if bot.guilds else (await bot.fetch_guild(PET_OWNER_GUILD))
+    members = guild.members or [member async for member in guild.fetch_members()]
     
     # Assign levels based on people's messages.
     
@@ -285,6 +288,10 @@ async def on_ready() :
     
     print('[LOG] Beam me up scotty ;)')
     
+    # Syncing activity_index_cache
+    activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val() or []
+    activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
+    
     try :
         bot_owner = bot.get_user(BOT_OWNER_ID)
         if bot_owner.dm_channel == None :
@@ -294,10 +301,6 @@ async def on_ready() :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
 
     await sync_db_invite_cache()
-
-    # Syncing activity_index_cache
-    activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val() or []
-    activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
     
     if ENVIRONMENT_TYPE == 'PROD' :
         bot_updatation.start()
@@ -324,7 +327,7 @@ async def on_invite_create(invite) :
     
     firebase_db_obj.child('invite_cache').child(invite.code).set(invite_info)
     
-    audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
+    audit__channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
     await audit_logs_channel.send(f'[INVITE CREATION LOG]: An invite was created by {invite.inviter.name}.')
     await sync_db_invite_cache()
     return
@@ -346,7 +349,7 @@ async def on_invite_delete(invite) :
 
 @bot.event
 async def on_member_join(member) :
-    guild = bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD))
+    guild = bot.guilds[0] if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD)))
     
     # welcome stuff..
     
@@ -901,7 +904,7 @@ async def on_boost(booster) :
     # Notify about it to people on the server.
     boost_notif_channel = bot.get_channel(BOOSTER_NOTIF_CHANNEL_ID)
     if boost_notif_channel == None :
-        boost_notif_channel = await bot.fetch_channel(BOOSTER_NOTIF_CHANNEL_ID)
+        boost_notif_channel = [channel for channel in bot.guilds[0].text_channels if channel.id == BOOSTER_NOTIF_CHANNEL_ID][0] if bot.guilds else (await bot.fetch_channel(BOOSTER_NOTIF_CHANNEL_ID))
     
     boost_notif_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), 
                                       title = f'♡ __{booster.name} just boosted the server!__',
@@ -929,7 +932,7 @@ async def on_boost(booster) :
     # Changing up roles
     guild = bot.get_guild(PET_OWNER_GUILD)
     if guild == None :
-        guild = await bot.fetch_guild(PET_OWNER_GUILD)
+        guild = bot.guilds[0] if bot.guilds else (await bot.fetch_guild(PET_OWNER_GUILD))
     if prev_tier != '0' :
         old_tier_role = guild.get_role(BOOSTER_TIER_ROLE_IDS[prev_tier])
         await booster.remove_roles(old_tier_role)
@@ -1036,7 +1039,7 @@ async def run_defamer_check(message) :
     
     guild = bot.get_guild(PET_OWNER_GUILD)
     if guild == None :
-        guild = await bot.fetch_guild(PET_OWNER_GUILD)
+        guild = bot.guilds[0] if bot.guilds else (await bot.fetch_guild(PET_OWNER_GUILD))
     
     # if guild.is_dm_spam_detected(): danger_index += 4.0
     # if guild.is_raid_detected(): danger_index += 4.0
@@ -1078,10 +1081,11 @@ def _welcome_calculate_decay_with_sharp_drop(time_diff: dt.timedelta):
     return max(1.0, math.ceil(scale * math.exp(-sharp_decay_rate * adjusted_minutes)))
 
 async def welcome_count_check(message) :
-    global WELCOME_CHANNEL_ID
+    global WELCOME_CHANNEL_ID, recent_welcome_message, recently_cached_messages
     
     if message.channel.id != WELCOME_CHANNEL_ID: return
-    og_msg = (message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)) # Fetch the parent message for this reply message.
+    matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
+    og_msg = recent_welcome_message if (recent_welcome_message.id == message.reference.message_id) else (matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))) # Fetch the parent message for this reply message.
 
     # If the member who joined is also the one writing this message, then its not considered for point gain.
     if og_msg.author == message.author: return
@@ -1198,7 +1202,7 @@ def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = F
 
 @bot.event
 async def on_message(message) :
-    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, activity_index_cache, CACHE_RETENTION_DURATION, activity_index_db_upload_time, ACTIVITY_INDEX_DB_CACHING_DURATION, current_bot_status, BOT_STATUSES, status_rotation_time, STATUS_ROTATION_DURATION
+    global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, activity_index_cache, CACHE_RETENTION_DURATION, activity_index_db_upload_time, ACTIVITY_INDEX_DB_CACHING_DURATION, current_bot_status, BOT_STATUSES, status_rotation_time, STATUS_ROTATION_DURATION, recent_welcome_message, recently_cached_messages, MESSAGE_CACHE_LIM
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
     if message.interaction_metadata != None :
@@ -1224,7 +1228,7 @@ async def on_message(message) :
         
         await on_boost(booster)
         return
-    elif message.channel.type == discord.ChannelType.private :
+    elif message.channel.type == discord.ChannelType.private and not message.startswith('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ') :
         ## Can be added in later if needed, removed cuz I feel like its required for us to also see sallie's messages for continuity of message flow in DMs
         # if message.author.id != BOT_SELF_USER_ID :
         dm_log_channel = bot.get_channel(SALLIE_DM_LOG_CHANNEL_ID) # Fetches the DM Logging Channel for sallie. Uses non async way to prevent ratelimit issues.
@@ -1253,13 +1257,19 @@ async def on_message(message) :
     elif message.type == discord.MessageType.reply :
         # ... check for qotd count[TODO] and welcome count[currently in development]
         await welcome_count_check(message)
+
+    if message.type == discord.MessageType.new_member :
+        recent_welcome_message = message
+    if len(recently_cached_messages) > MESSAGE_CACHE_LIM :
+        recently_cached_messages = recently_cached_messages[1 : ]
+    recently_cached_messages.append(message)
     
     # await run_defamer_check()
     if message.channel.type != discord.ChannelType.private and message.author.id != BOT_SELF_USER_ID and (not message.author.bot) :
         if message.guild.id == PET_OWNER_GUILD :
             activity_index_cache_entry = [[calculate_activity_index(dt.timedelta(hours = 1)), calculate_activity_index(dt.timedelta(minutes = 1)), calculate_activity_index(dt.timedelta(seconds = 10))], get_datetime_str(message.created_at)]
             activity_index_cache.append(activity_index_cache_entry)
-    activity_index_cache = [cache_entry for cache_entry in activity_index_cache if datetime.now(dt.UTC) >= get_datetime_obj(cache_entry[1]) >= (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_DURATION)).replace(tzinfo = dt.UTC)]
+   [cache_entry for cache_entry in activity_index_cache if datetime.now(dt.UTC) >= get_datetime_obj(cache_entry[1]) >= (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_DURATION)).replace(tzinfo = dt.UTC)]
 
     # Updating the activity_index_cache value in db every hour.
     if message.created_at.replace(tzinfo = dt.UTC) > get_datetime_obj(activity_index_db_upload_time) :
@@ -1307,7 +1317,7 @@ async def on_message(message) :
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
         embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = 'Anonymous Confession', description = confession)
-        confession_channel = await bot.fetch_channel(CONFESSION_CHANNEL_ID)
+        confession_channel = [channel for channel in bot.guilds[0].channels if channel.id == CONFESSION_CHANNEL_ID][0] if bot.guilds else (await bot.fetch_channel(CONFESSION_CHANNEL_ID))
         confession_msg = await confession_channel.send(embed = embed)
         if not isinstance(message.channel, discord.DMChannel) :
             await message.delete()
@@ -1404,7 +1414,9 @@ async def on_message(message) :
         try :
             content = ' '.join(message.content.split(' ')[2 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
-                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
+                # parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
                 content = parent_msg.content
             channel = message.channel_mentions[0]
             await channel.send(f'{content}')
@@ -1415,7 +1427,8 @@ async def on_message(message) :
         try :
             content = ' '.join(message.content.split(' ')[2 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
-                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
                 content = parent_msg.content
             mention = message.mentions[0]
             if mention != message.author : 
@@ -1436,7 +1449,8 @@ async def on_message(message) :
             cmd_args = message.content.split(' ')
             content = ' '.join(cmd_args[3 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
-                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
                 content = parent_msg.content
             channel = message.channel_mentions[0]
             message_id = int(cmd_args[2])
@@ -1445,7 +1459,9 @@ async def on_message(message) :
                 msg = channel.get_partial_message(message_id)
                 await msg.reply(f'{content}')
             except :
-                msg = await channel.fetch_message(message_id)
+                matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message_id]
+                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
+                # msg = await channel.fetch_message(message_id)
                 await msg.reply(f'{content}')
 
             await message.channel.send('Reply sent successfully!')
@@ -1457,7 +1473,8 @@ async def on_message(message) :
             cmd_args = message.content.split(' ')
             content = ' '.join(cmd_args[3 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
-                parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
                 content = parent_msg.content
             mention = message.mentions[0]
             channel = mention.dm_channel
@@ -1467,7 +1484,8 @@ async def on_message(message) :
                 msg = channel.get_partial_message(message_id)
                 await msg.reply(f'{content}')
             except :
-                msg = await channel.fetch_message(message_id)
+                matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message_id]
+                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
                 await msg.reply(f'{content}')
 
             await message.channel.send('Reply sent successfully!')
@@ -1491,7 +1509,8 @@ async def on_message(message) :
                 msg = channel.get_partial_message(message_id)
                 await msg.add_reaction(emoji)
             except :
-                msg = await channel.fetch_message(message_id)
+                matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message_id]
+                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
                 await msg.add_reaction(emoji)
 
             await message.channel.send('Reacted to the message successfully!')
