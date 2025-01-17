@@ -1228,7 +1228,7 @@ async def on_message(message) :
         
         await on_boost(booster)
         return
-    elif message.channel.type == discord.ChannelType.private and not message.startswith('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ') :
+    elif message.channel.type == discord.ChannelType.private and not message.content.startswith('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ') :
         ## Can be added in later if needed, removed cuz I feel like its required for us to also see sallie's messages for continuity of message flow in DMs
         # if message.author.id != BOT_SELF_USER_ID :
         dm_log_channel = bot.get_channel(SALLIE_DM_LOG_CHANNEL_ID) # Fetches the DM Logging Channel for sallie. Uses non async way to prevent ratelimit issues.
