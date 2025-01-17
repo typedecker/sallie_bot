@@ -1269,7 +1269,7 @@ async def on_message(message) :
         if message.guild.id == PET_OWNER_GUILD :
             activity_index_cache_entry = [[calculate_activity_index(dt.timedelta(hours = 1)), calculate_activity_index(dt.timedelta(minutes = 1)), calculate_activity_index(dt.timedelta(seconds = 10))], get_datetime_str(message.created_at)]
             activity_index_cache.append(activity_index_cache_entry)
-   [cache_entry for cache_entry in activity_index_cache if datetime.now(dt.UTC) >= get_datetime_obj(cache_entry[1]) >= (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_DURATION)).replace(tzinfo = dt.UTC)]
+   activity_index_cache = [cache_entry for cache_entry in activity_index_cache if datetime.now(dt.UTC) >= get_datetime_obj(cache_entry[1]) >= (datetime.now(dt.UTC) - dt.timedelta(days = CACHE_RETENTION_DURATION)).replace(tzinfo = dt.UTC)]
 
     # Updating the activity_index_cache value in db every hour.
     if message.created_at.replace(tzinfo = dt.UTC) > get_datetime_obj(activity_index_db_upload_time) :
