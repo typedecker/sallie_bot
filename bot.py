@@ -5,20 +5,20 @@ Created on Tue May 21 20:02:05 2024
 @author: ketch
 """
 
-# ENVIRONMENT_TYPE = 'DEV'
 ENVIRONMENT_TYPE = 'PROD'
 print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 
 import nest_asyncio
 nest_asyncio.apply()
 
-import discord, pyrebase, os, asyncio, flask, sys, secrets, random, io, re, math
+import discord, pyrebase, os, asyncio, flask, sys, secrets, random, io, re, math, threading, time, requests, json
 from discord.ext import tasks
 from gtts import gTTS
 from flask import Flask, render_template, redirect, url_for, request, make_response, session
 from datetime import datetime
 from threading import Thread
 from markupsafe import escape
+from collections import deque
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 import datetime as dt
@@ -73,8 +73,10 @@ SLAPPING_SALAMANDER_SERVER_ACCENT = '#F05E22'
 CACHE_RETENTION_DURATION = 2 # 1 day[in days]
 ACTIVITY_INDEX_DB_CACHING_DURATION = 1 # 1 hour[in hours]
 STATUS_ROTATION_DURATION = 10 # 10 mins[in minutes]
-DESIRED_TICK_NUM = 10
+DESIRED_TICK_NUM = 10 # The number of annotations on the x axis of activity chart
 MESSAGE_CACHE_LIM = 10_000
+BUMP_SYNC_LOOKBACK_INTERVAL = 2 * 24 # 2 days[in hours]
+WELCOME_SYNC_LOOKBACK_INTERVAL = 12 # 12 hours[in hours]
 BOT_STATUSES = ['Getting Slapped by the slappers!', # OG message!
                 'Being taught cuteness and good manners by mama cc~ ✨😊🌸!', # CC
                 'Drinking beer and getting horny with aya auntie~~ ehe :3 🍻', # AYA
@@ -84,9 +86,7 @@ BOT_STATUSES = ['Getting Slapped by the slappers!', # OG message!
                 'Sipping some good ol\' coffee with my lovely old granny aunt dex 💜~', # Dex
                 'Grinding some demons on geometry dash, yesh! yesh! Dada taught me hehe~', # GD Reference
                 'Woosh! if you read this, may you have an awesome day, mwah! 🦎', # Random cute status
-                'Listening to some linkin park songs with auntie liv ❤️, shes so hot!!', # LIV
                 'Reading some books reawwy carefully with reading ekitten in da slapping salamanders serva library~! 💛', # Reading Ekitten
-                'Giving tons of huggies to rat auntie as I hold her hand and guide her way through the tough times~! 💙', # RAT
               ]
 SPAM_CHANNEL_ID = 1245681028178251818
 AUDIT_LOGS_CHANNEL_ID = 1230975925487927349
@@ -94,6 +94,7 @@ CONFESSION_CHANNEL_ID = 1239309061585899572
 BOOSTER_NOTIF_CHANNEL_ID = 1269368301256179772
 SALLIE_DM_LOG_CHANNEL_ID = 1327052773673664605
 WELCOME_CHANNEL_ID = 1230972606690230272
+BUMP_CHANNEL_ID = 1230972933728505948
 BOOSTER_TIER_ROLE_IDS = {'1': 1269733606432051210,
                          '2': 1269733728025055334,
                          '3': 1269733769619701902,
@@ -101,6 +102,7 @@ BOOSTER_TIER_ROLE_IDS = {'1': 1269733606432051210,
 BOT_OWNER_ID = 568446269610000385
 BOT_SELF_USER_ID = 1231274952968372317
 PET_OWNER_GUILD = 1230967641200394302
+DISBOARD_BOT_ID = 302050872383242240
 
 HELP_DICT = {
             'ping': ['$$ping', 'Pong! Returns the ping in milliseconds for the bot.'],
@@ -140,7 +142,7 @@ L_OTPs, R_OTPs = {}, {}
 
 #---------DATABASE SETUP----------
 # Initializes the configurations for the firebase realtime database.
-FIREBASE_API_KEY = os.environ['FIREBASE_API_KEY']
+FIREBASE_API_KEY = 'xxMwYzAmDiqGVSBdc9PxXXQJDvLJGd2VZtubi2an'
 
 database_config = {          
                     "apiKey" : FIREBASE_API_KEY,
@@ -194,6 +196,17 @@ def get_font(content_length) :
     font = ImageFont.truetype(font = 'assets/arial.ttf', size = font_size)
     return font
 
+def get_tenor_gifs(search_term, limit) :
+    apikey = os.environ['TENOR_API_KEY']
+    r = requests.get("https://tenor.googleapis.com/v2/search?q=%s&key=%s&limit=%s" % (search_term, apikey, limit))
+    
+    if r.status_code == 200:
+        # load the GIFs using the urls for the smaller GIF sizes
+        tenor_response = json.loads(r.content)
+        top_matches = [k['media_formats']['gif']['url'] for k in tenor_response['results']]
+        return top_matches
+    return []
+
 def get_datetime_str(do) :
     return do.strftime(datetime_date_format)
 
@@ -204,9 +217,169 @@ activity_index_cache = firebase_db_obj.child('activity_index_cache').get().val()
 activity_index_db_upload_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(hours = ACTIVITY_INDEX_DB_CACHING_DURATION))
 status_rotation_time = get_datetime_str(datetime.now(dt.UTC))
 
+
+
+### Ratelimited Proofing ------------
+def ratelimited(rate: int):
+    """
+    An asynchronous decorator to limit the rate of execution for an async function.
+
+    Args:
+        rate (int): The time interval (in seconds) between consecutive executions.
+    """
+    def decorator(func):
+        last_executed = 0  # Track the last execution time
+        queue = deque()  # Queue to hold pending calls
+        is_processing = False  # Flag to indicate if the queue is being processed
+
+        async def process_queue():
+            nonlocal last_executed, is_processing
+            while queue:
+                now = asyncio.get_event_loop().time()
+                if now - last_executed >= rate:
+                    args, kwargs, future = queue.popleft()
+                    try:
+                        result = await func(*args, **kwargs)  # Execute the original function
+                        future.set_result(result)  # Set the result for the caller
+                    except Exception as e:
+                        future.set_exception(e)  # Propagate exceptions back to the caller
+                    last_executed = now
+                else:
+                    await asyncio.sleep(0.1)  # Wait before checking the queue again
+            is_processing = False
+
+        async def wrapper(*args, **kwargs):
+            nonlocal is_processing
+            loop = asyncio.get_event_loop()
+            future = loop.create_future()  # Future to track the result of the function call
+            queue.append((args, kwargs, future))  # Add the call to the queue
+            if not is_processing:
+                is_processing = True
+                asyncio.create_task(process_queue())  # Start processing the queue
+            return await future  # Wait for the result and return it to the caller
+
+        return wrapper
+
+    return decorator
+
+def ratelimited_async_gen(rate: int):
+    """
+    A decorator for rate-limiting asynchronous generators.
+
+    Args:
+        rate (int): Time interval (in seconds) between consecutive fetches.
+
+    Returns:
+        Decorated asynchronous generator.
+    """
+    def decorator(async_gen_func):
+        async def wrapped(*args, **kwargs):
+            # Create a queue to enforce rate limits
+            queue = deque()
+            lock = threading.Lock()
+            last_executed = [0]
+
+            # Producer: Wrap the async generator and add results to the queue
+            async def producer():
+                async for item in async_gen_func(*args, **kwargs):
+                    while True:
+                        with lock:
+                            if time.time() - last_executed[0] >= rate:
+                                queue.append(item)
+                                last_executed[0] = time.time()
+                                break
+                        await asyncio.sleep(0.1)  # Prevent busy waiting
+
+            # Start the producer in the background
+            producer_task = asyncio.create_task(producer())
+
+            # Consumer: Yield results from the queue
+            while not producer_task.done() or queue:
+                if queue:
+                    yield queue.popleft()
+                else:
+                    await asyncio.sleep(0.1)  # Prevent busy waiting
+
+        return wrapped
+    return decorator
+
+# Ratelimited variants of some commonly used async methods.
+
+@ratelimited(rate = 1)  # 1 execution per second (adjust rate as needed)
+async def ratelimited_fetch_guild(bot, guild_id):
+    return await bot.fetch_guild(guild_id)
+
+@ratelimited(rate = 1)
+async def ratelimited_fetch_channel(bot, channel_id):
+    return await bot.fetch_channel(channel_id)
+
+@ratelimited(rate = 2)
+async def ratelimited_change_presence(bot, **kwargs):
+    await bot.change_presence(**kwargs)
+
+@ratelimited(rate = 2)
+async def ratelimited_guild_invites(guild):
+    return await guild.invites()
+
+@ratelimited(rate = 2)
+async def ratelimited_channel_send(channel, content = '', **kwargs):
+    await channel.send(content, **kwargs)
+
+@ratelimited(rate = 1)
+async def ratelimited_fetch_message(channel, message_id):
+    return await channel.fetch_message(message_id)
+
+@ratelimited(rate = 2)
+async def ratelimited_create_dm(user):
+    return await user.create_dm()
+
+@ratelimited(rate = 2)
+async def ratelimited_user_connect_to_voice_channel(channel):
+    return await channel.connect()
+
+@ratelimited(rate = 2)
+async def ratelimited_member_add_roles(member, *roles, reason = None):
+    await member.add_roles(*roles, reason = reason)
+
+@ratelimited(rate = 2)
+async def ratelimited_member_remove_roles(member, *roles, reason = None):
+    await member.remove_roles(*roles, reason = reason)
+
+@ratelimited(rate = 2)
+async def ratelimited_asset_read(asset):
+    return await asset.read()
+
+@ratelimited(rate = 1)
+async def ratelimited_add_reaction(message, emoji):
+    await message.add_reaction(emoji)
+
+@ratelimited(rate = 1)
+async def ratelimited_message_delete(message):
+    await message.delete()
+
+@ratelimited(rate = 1)
+async def ratelimited_reply(message, content, **kwargs):
+    return await message.reply(content, **kwargs)
+
+@ratelimited(rate = 2)
+async def ratelimited_voice_client_disconnect(voice_client):
+    await voice_client.disconnect()
+
+# Ratelimited variants of some commonly used async generators.
+
+# Applying the rate-limited variant to `channel.history`
+@ratelimited_async_gen(rate = 1)  # 1 fetch every 2 seconds
+async def ratelimited_history(channel, *args, **kwargs):
+    async for message in channel.history(*args, **kwargs):
+        yield message
+
+### ------------
+
+
+
 async def fetch_invite_data(guild = None) :
-    guild = (guild or bot.guilds[0]) if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD)))
-    invites = await guild.invites()
+    guild = (guild or bot.guilds[0]) if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await ratelimited_fetch_guild(bot, PET_OWNER_GUILD)))
+    invites = await ratelimited_guild_invites(guild)
     invite_data = {}
     for invite in invites :
         invite_data[invite.code] = {'inviter_id' : invite.inviter.id,
@@ -218,8 +391,8 @@ async def fetch_invite_data(guild = None) :
 async def sync_db_invite_cache() :
     firebase_db_obj.child('invite_cache').child('empty').set({})
     
-    guild = bot.guilds[0] if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD)))
-    invites = await guild.invites()
+    guild = bot.guilds[0] if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await ratelimited_fetch_guild(bot, PET_OWNER_GUILD)))
+    invites = await ratelimited_guild_invites(guild)
     
     for invite in invites :
         invite_info = {'inviter_id' : invite.inviter.id,
@@ -235,24 +408,24 @@ async def review_ping_check_iteration(member, review_ping_channel) :
     found_role_list = [role for role in member.roles if role.id == REVIEW_PING_ROLE_ID]
     print(f'[LOG] Review availability is being examined for {member.name} right now... {True if any(found_role_list) else False} {(datetime.now(dt.UTC).astimezone(dt.timezone.utc) - member.joined_at)}')
     if any(found_role_list) and (datetime.now(dt.UTC).astimezone(dt.timezone.utc) - member.joined_at) > dt.timedelta(days = 5) :
-        await review_ping_channel.send(f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
+        await ratelimited_channel_send(review_ping_channel, f'Hey {member.mention}! It would be great if you could post a review of our server on disboard :D! It helps us grow and bring new friends to the server faster ✨!!!\n https://disboard.org/review/create/1230967641200394302')
         
         if member.dm_channel == None :
-            await member.create_dm()
+            await ratelimited_create_dm(member)
         try :
-            await member.dm_channel.send('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + review_ping_channel.mention)
+            await ratelimited_channel_send(member.dm_channel, 'Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + review_ping_channel.mention)
         except Exception as e :
             print(e)
-            await review_ping_channel.send(f'{member.mention} you are a FAT ASS BITCH for blocking me hmpf~! FUCK YOU! Why are you even in the server if you\'re never gonna talk?')
+            await ratelimited_channel_send(review_ping_channel, f'{member.mention} you are a FAT ASS BITCH for blocking me hmpf~! FUCK YOU! Why are you even in the server if you\'re never gonna talk?')
         
-        # await member.remove_roles(*found_role_list)
+        # await ratelimited_member_remove_roles(member, *found_role_list)
     return
 
 async def review_ping_check(members) :
     print('[LOG] Review ping check is under way.')
     REVIEW_PING_CHANNEL_ID = 1242796180359086130
     
-    review_ping_channel = [channel for channel in bot.guilds[0].text_channels if channel.id == REVIEW_PING_CHANNEL_ID][0] if bot.guilds else (await bot.fetch_channel(REVIEW_PING_CHANNEL_ID))
+    review_ping_channel = [channel for channel in bot.guilds[0].text_channels if channel.id == REVIEW_PING_CHANNEL_ID][0] if bot.guilds else (await ratelimited_fetch_channel(bot, REVIEW_PING_CHANNEL_ID))
     for member in members :
         ratelimited_iteration = ratelimiter.handle(func = review_ping_check_iteration, default_rl = 1)
         await ratelimited_iteration(member, review_ping_channel)
@@ -267,7 +440,7 @@ async def bot_updatation() :
     # Called every 12 hours and does all the timed updatation that the bot needs.
     print('[LOG] Bot Updatation is under way.')
     
-    guild = bot.guilds[0] if bot.guilds else (await bot.fetch_guild(PET_OWNER_GUILD))
+    guild = bot.guilds[0] if bot.guilds else (await ratelimited_fetch_guild(bot, PET_OWNER_GUILD))
     members = guild.members or [member async for member in guild.fetch_members()]
     
     # Assign levels based on people's messages.
@@ -282,7 +455,7 @@ async def on_ready() :
 
     current_bot_status = BOT_STATUSES[0]
     bot_activity = discord.Game(name = current_bot_status, start = bot.user.created_at)
-    await bot.change_presence(activity = bot_activity)
+    await ratelimited_change_presence(bot, activity = bot_activity)
 
     status_rotation_time = get_datetime_str(datetime.now(dt.UTC) + dt.timedelta(minutes = STATUS_ROTATION_DURATION))
     
@@ -295,12 +468,14 @@ async def on_ready() :
     try :
         bot_owner = bot.get_user(BOT_OWNER_ID)
         if bot_owner.dm_channel == None :
-            await bot_owner.create_dm()
-        await bot_owner.dm_channel.send('Sallie the salamander has been deployed at {utc_time}'.format(utc_time = datetime.now(dt.UTC).strftime(datetime_date_format)))
+            await ratelimited_create_dm(bot_owner)
+        await ratelimited_channel_send(bot_owner.dm_channel, 'Sallie the salamander has been deployed at {utc_time}'.format(utc_time = datetime.now(dt.UTC).strftime(datetime_date_format)))
     except :
         print('[on_ready func]: Ready action notif couldn\'t be sent to Sallie\'s Pet owner.')
 
     await sync_db_invite_cache()
+    await sync_bump_score()
+    await sync_welcome_score()
     
     if ENVIRONMENT_TYPE == 'PROD' :
         bot_updatation.start()
@@ -315,6 +490,8 @@ async def on_resume() :
         bot_updatation.start()
     
     await sync_db_invite_cache()
+    await sync_bump_score()
+    await sync_welcome_score()
     
     BOT_START_TIME = datetime.now(dt.UTC)
     return
@@ -327,8 +504,8 @@ async def on_invite_create(invite) :
     
     firebase_db_obj.child('invite_cache').child(invite.code).set(invite_info)
     
-    audit__channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
-    await audit_logs_channel.send(f'[INVITE CREATION LOG]: An invite was created by {invite.inviter.name}.')
+    audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
+    await ratelimited_channel_send(audit_logs_channel, f'[INVITE CREATION LOG]: An invite was created by {invite.inviter.name}.')
     await sync_db_invite_cache()
     return
 
@@ -343,13 +520,13 @@ async def on_invite_delete(invite) :
     firebase_db_obj.child('invite_cache').child(invite.code).remove()
     
     audit_logs_channel = bot.get_channel(AUDIT_LOGS_CHANNEL_ID)
-    await audit_logs_channel.send(f'[INVITE DELETION LOG]: An invite by {invite_info["inviter_name"]} was deleted.')
+    await ratelimited_channel_send(audit_logs_channel, f'[INVITE DELETION LOG]: An invite by {invite_info["inviter_name"]} was deleted.')
     await sync_db_invite_cache()
     return
 
 @bot.event
 async def on_member_join(member) :
-    guild = bot.guilds[0] if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await bot.fetch_guild(PET_OWNER_GUILD)))
+    guild = bot.guilds[0] if bot.guilds else (bot.get_guild(PET_OWNER_GUILD) or (await ratelimited_fetch_guild(bot, PET_OWNER_GUILD)))
     
     # welcome stuff..
     
@@ -364,7 +541,7 @@ async def on_member_join(member) :
     for code, info in updated_invites.items() :
         if info['uses'] > invites_cache[code]['uses'] :
             # .. this is the invite used to join.
-            await audit_logs_channel.send(f'[INVITATION DETECTION LOGS]: {member.name} was invited by {info["inviter_name"]}.')
+            await ratelimited_channel_send(audit_logs_channel, f'[INVITATION DETECTION LOGS]: {member.name} was invited by {info["inviter_name"]}.')
             break
         continue
     
@@ -566,8 +743,8 @@ async def dm_logging_user(discord_id) :
     
     try :
         if logging_user.dm_channel == None :
-            await logging_user.create_dm()
-        await logging_user.dm_channel.send(f'The OTP(One Time Password)/Secret Key for you to login to your account is given below: ```{L_OTPs[discord_id]["OTP"]}``` To login you must copy this and paste it on the page as instructed. If you have not tried logging into your account and are seeing this message, contact the server staff immediately as this might be a security issue!')
+            await ratelimited_create_dm(logging_user)
+        await logging_user.dm_channelratelimited_channel_send(f'The OTP(One Time Password)/Secret Key for you to login to your account is given below: ```{L_OTPs[discord_id]["OTP"]}``` To login you must copy this and paste it on the page as instructed. If you have not tried logging into your account and are seeing this message, contact the server staff immediately as this might be a security issue!')
         return True, {}
     except Exception as e :
         print(e)
@@ -774,8 +951,8 @@ async def dm_registering_user(discord_id) :
     
     try :
         if registering_user.dm_channel == None :
-            await registering_user.create_dm()
-        await registering_user.dm_channel.send(f'The OTP(One Time Password)/Secret Key for you to register your account is given below: ```{R_OTPs[discord_id]["OTP"]}``` To register your account successfully, you must copy this and paste it on the page as instructed. If you have not tried registering your account and are seeing this message, contact the server staff immediately as this might be a security issue!')
+            await ratelimited_create_dm(registering_user)
+        await ratelimited_channel_send(registering_user.dm_channel, f'The OTP(One Time Password)/Secret Key for you to register your account is given below: ```{R_OTPs[discord_id]["OTP"]}``` To register your account successfully, you must copy this and paste it on the page as instructed. If you have not tried registering your account and are seeing this message, contact the server staff immediately as this might be a security issue!')
         return True, {}
     except Exception as e :
         print(e)
@@ -904,13 +1081,13 @@ async def on_boost(booster) :
     # Notify about it to people on the server.
     boost_notif_channel = bot.get_channel(BOOSTER_NOTIF_CHANNEL_ID)
     if boost_notif_channel == None :
-        boost_notif_channel = [channel for channel in bot.guilds[0].text_channels if channel.id == BOOSTER_NOTIF_CHANNEL_ID][0] if bot.guilds else (await bot.fetch_channel(BOOSTER_NOTIF_CHANNEL_ID))
+        boost_notif_channel = [channel for channel in bot.guilds[0].text_channels if channel.id == BOOSTER_NOTIF_CHANNEL_ID][0] if bot.guilds else (await ratelimited_fetch_channel(bot, BOOSTER_NOTIF_CHANNEL_ID))
     
     boost_notif_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), 
                                       title = f'♡ __{booster.name} just boosted the server!__',
                                       description = 'Thanks so much for boosting our server yay!!')
     boost_notif_embed.set_thumbnail(url = 'https://media.discordapp.net/attachments/1230975895213441034/1269723474923094110/images.png?ex=66b119a2&is=66afc822&hm=e154d18c3935830b2d57343bba2642561d1b43705ab2b341cb538579da1ac2ae&=&format=webp&quality=lossless&width=450&height=252')
-    await boost_notif_channel.send(embed = boost_notif_embed)
+    await ratelimited_channel_send(boost_notif_channel, embed = boost_notif_embed)
     
     name = firebase_db_obj.child('boost').child(booster.id).child('username').get().val()
     count = firebase_db_obj.child('boost').child(booster.id).child('count').get().val() or 0
@@ -932,20 +1109,20 @@ async def on_boost(booster) :
     # Changing up roles
     guild = bot.get_guild(PET_OWNER_GUILD)
     if guild == None :
-        guild = bot.guilds[0] if bot.guilds else (await bot.fetch_guild(PET_OWNER_GUILD))
+        guild = bot.guilds[0] if bot.guilds else (await ratelimited_fetch_guild(bot, PET_OWNER_GUILD))
     if prev_tier != '0' :
         old_tier_role = guild.get_role(BOOSTER_TIER_ROLE_IDS[prev_tier])
-        await booster.remove_roles(old_tier_role)
+        await ratelimited_member_remove_roles(booster, old_tier_role)
     
     new_tier_role = guild.get_role(BOOSTER_TIER_ROLE_IDS[tier])
-    await booster.add_roles(new_tier_role)
+    await ratelimited_member_add_roles(booster, new_tier_role)
     
     if prev_tier != '++' :
         boost_tier_notif_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), 
                                                title = f'♡ __{booster.name} just got a Tier Upgrade!!__',
                                                description = f'Congrats! Your new boost tier is Tier {tier}!')
         boost_tier_notif_embed.set_thumbnail(url = 'https://media.discordapp.net/attachments/1230975895213441034/1269723474923094110/images.png?ex=66b119a2&is=66afc822&hm=e154d18c3935830b2d57343bba2642561d1b43705ab2b341cb538579da1ac2ae&=&format=webp&quality=lossless&width=450&height=252')
-        await boost_notif_channel.send(embed = boost_tier_notif_embed)
+        await ratelimited_channel_send(boost_notif_channel, embed = boost_tier_notif_embed)
     
     firebase_db_obj.child('boost').child(str(booster.id)).child('username').set(booster.name)
     firebase_db_obj.child('boost').child(str(booster.id)).child('count').set(count)
@@ -974,7 +1151,7 @@ async def generate_rank_card(message) :
     size = (109, 109)
     pfp = member.guild_avatar or member.avatar
     pfp_asset = pfp.with_size(128)
-    pfp_img_data = io.BytesIO(await pfp_asset.read())
+    pfp_img_data = io.BytesIO(await ratelimited_asset_read(pfp_asset))
     pfp_img_obj = Image.open(pfp_img_data)
     pfp_img_obj = pfp_img_obj.resize(size)
     
@@ -989,7 +1166,7 @@ async def generate_rank_card(message) :
     I1 = ImageDraw.Draw(img)
     
     level_data = firebase_db_obj.child('levels').get().val()
-    print(level_data)
+    
     sys.stdout.flush()
     # {id: {'username': ..., 'xp': ...}}
     ranked_id_list = sorted(level_data, key = lambda k : level_data.get(k)['xp'], reverse = True)
@@ -1003,7 +1180,7 @@ async def generate_rank_card(message) :
     I1.text((183, 44), "{member_name}".format(member_name = member_name), fill = (0, 0, 0), font = get_font(len("{member_name}".format(member_name = member_name))))
     I1.text((183, 97), "Rank: {member_rank}".format(member_rank = member_rank), fill = (0, 0, 0), font = small_font)
     member_current_lvl_xp = member_xp - level_summation_func(member_level - 1)
-    print((member_current_lvl_xp), (level_func(member_level)), (33 + ((378 - 33) * (member_current_lvl_xp / level_func(member_level))), ((member_current_lvl_xp / level_func(member_level)))))
+    
     sys.stdout.flush()
     x1 = 33 + ((378 - 33) * (member_current_lvl_xp / level_func(member_level)))
     I1.rounded_rectangle([33, 165, x1, 185], radius = 10, fill = (231, 162, 44, 230))
@@ -1018,7 +1195,7 @@ async def generate_rank_card(message) :
     with io.BytesIO() as image_binary :
         img.save(image_binary, 'PNG')
         image_binary.seek(0)
-        await message.channel.send(file = discord.File(fp = image_binary, filename = 'image.png'))
+        await ratelimited_channel_send(message.channel, file = discord.File(fp = image_binary, filename = 'image.png'))
     return
 
 async def run_defamer_check(message) :
@@ -1039,7 +1216,7 @@ async def run_defamer_check(message) :
     
     guild = bot.get_guild(PET_OWNER_GUILD)
     if guild == None :
-        guild = bot.guilds[0] if bot.guilds else (await bot.fetch_guild(PET_OWNER_GUILD))
+        guild = bot.guilds[0] if bot.guilds else (await ratelimited_fetch_guild(bot, PET_OWNER_GUILD))
     
     # if guild.is_dm_spam_detected(): danger_index += 4.0
     # if guild.is_raid_detected(): danger_index += 4.0
@@ -1084,8 +1261,16 @@ async def welcome_count_check(message) :
     global WELCOME_CHANNEL_ID, recent_welcome_message, recently_cached_messages
     
     if message.channel.id != WELCOME_CHANNEL_ID: return
-    matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
-    og_msg = recent_welcome_message if (recent_welcome_message.id == message.reference.message_id) else (matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))) # Fetch the parent message for this reply message.
+    
+    matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]    
+    
+    if recent_welcome_message != None :
+        if (recent_welcome_message.id == message.reference.message_id) :
+            og_msg = recent_welcome_message 
+    elif any(matching_recent_messages) :
+        og_msg = matching_recent_messages[0] 
+    else :
+        og_msg = ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id))) # Fetch the parent message for this reply message.
 
     # If the member who joined is also the one writing this message, then its not considered for point gain.
     if og_msg.author == message.author: return
@@ -1145,7 +1330,7 @@ async def welcome_count_check(message) :
         emoji = discord.PartialEmoji.from_str(emoji_str[0].strip())
     else :
         emoji = emoji_str_raw.strip()
-    await message.add_reaction(emoji)
+    await ratelimited_add_reaction(message, emoji)
     return
 
 def calculate_activity_index(lookback_duration: dt.timedelta) -> int :
@@ -1168,13 +1353,15 @@ def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = F
     mode_index = 'hms'.index(mode) # Get a mode_index instead of a string, better for usage in indexing stuff.
     
     if len(activity_index_cache) == 0: return None # If no cache has been stored yet, return None.
-    pass
+    
+    # If the lookback_duration is longer than a day, change the annotation format to include dates.
+    annotation_format = '%d %b %I:%M %p' if lookback_duration > dt.timedelta(days = 1) else '%I:%M %p' 
 
     x_vals, y_vals = [], []
     for activity_indices, datetime_str in activity_index_cache :
         datetime_obj = get_datetime_obj(datetime_str)
         if not ((datetime.now(dt.UTC) - lookback_duration).replace(tzinfo = dt.UTC) < datetime_obj < datetime.now(dt.UTC)): continue
-        x_vals.append(datetime_obj.strftime('%H:%M'))
+        x_vals.append(datetime_obj.strftime(annotation_format))
         y_vals.append(activity_indices[mode_index])
         continue
     
@@ -1200,27 +1387,102 @@ def generate_activity_graph(lookback_duration: dt.timedelta, mode: str, grid = F
     plt.close()  # Close the plot to free memory
     return buffer
 
+async def bump_count_check(message) :
+    # # Detects the fibo confirmation message and uses that to confirm the bump itself
+    # # No longer uses interaction metadata to detect bumps, thus making it less error prone.
+    # if message.author.id == FIBO_BOT_ID and message.channel.id == BUMP_CHANNEL_ID and message.content.startswith('Thx for bumping our Server! We will remind you in 2 hours!') :
+    #     bumper = message.mentions[0] # Fetch the user mentioned.
+        
+    #     # React to the Fibo Message with a sallie heart emoji for verification/confirmation.
+    #     emoji_str_raw = '<:sallie_pink_shiny_heart:1305443467073163265>'
+    #     emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)
+    #     if emoji_str != [] :
+    #         emoji = discord.PartialEmoji.from_str(emoji_str[0].strip())
+    #     else :
+    #         emoji = emoji_str_raw.strip()
+    #     await ratelimited_add_reaction(message, emoji)
+        
+    #     # Reply to the fibo message with a confirmation message too.
+    #     await ratelimited_reply(message, f'HEY THANKS {message.interaction_metadata.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
+        
+    #     # Fetching existing data from the db for the user's bump count and stuff.
+    #     name = firebase_db_obj.child('bump').child(bumper.id).child('username').get().val()
+    #     count = firebase_db_obj.child('bump').child(bumper.id).child('count').get().val() or 0
+        
+    #     # Updating the db with the new count.
+    #     firebase_db_obj.child('bump').child(str(bumper.id)).child('username').set(bumper.name)
+    #     firebase_db_obj.child('bump').child(str(bumper.id)).child('count').set(count + 1)
+    
+    # Newest and most refined detection system, uses only the bare minimum and doesnt rely on other bots.
+    if message.type == discord.MessageType.chat_input_command and message.author.id == DISBOARD_BOT_ID and message.channel.id == BUMP_CHANNEL_ID :
+        bumper = message.interaction_metadata.user # Fetch the user mentioned.
+        
+        # React to the Bump Message with a sallie heart emoji for verification/confirmation.
+        emoji_str_raw = '<:sallie_pink_shiny_heart:1305443467073163265>'
+        emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)
+        if emoji_str != [] :
+            emoji = discord.PartialEmoji.from_str(emoji_str[0].strip())
+        else :
+            emoji = emoji_str_raw.strip()
+        await ratelimited_add_reaction(message, emoji)
+        
+        # Reply to the bump message with a confirmation message too.
+        await ratelimited_reply(message, f'HEY THANKS {bumper.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
+        
+        # Fetching existing data from the db for the user's bump count and stuff.
+        count = firebase_db_obj.child('bump').child(bumper.id).child('count').get().val() or 0
+        
+        # Updating the db with the new count.
+        firebase_db_obj.child('bump').child(str(bumper.id)).child('username').set(bumper.name)
+        firebase_db_obj.child('bump').child(str(bumper.id)).child('count').set(count + 1)
+    return
+
+async def sync_bump_score() :
+    bump_channel = await ratelimited_fetch_channel(bot, BUMP_CHANNEL_ID)
+    lookback_timestamp = datetime.now(dt.UTC) - dt.timedelta(hours = BUMP_SYNC_LOOKBACK_INTERVAL)
+    
+    emoji_str_raw = '<:sallie_pink_shiny_heart:1305443467073163265>'
+    emoji_str = re.findall(r'(?:<a?:\w+:\d+>|:\w+:)', emoji_str_raw)
+    if emoji_str != [] :
+        emoji = discord.PartialEmoji.from_str(emoji_str[0].strip())
+    else :
+        emoji = emoji_str_raw.strip()
+    
+    await ratelimited_channel_send(bump_channel, 'Initiating bump sync procedure...')
+    async for msg in ratelimited_history(bump_channel, limit = 2000, after = lookback_timestamp, oldest_first = False) :
+        if msg.author.id == bot.user.id: continue
+        if msg.content == '$$block_sallie_bump_detection' and msg.author.id == BOT_OWNER_ID :
+            break
+        
+        if msg.author.id == DISBOARD_BOT_ID :
+            print(msg.reactions)
+            if not any([reaction == emoji for reaction in msg.reactions]) :
+                await bump_count_check(msg)
+        continue
+    await ratelimited_channel_send(bump_channel, 'Bump Sync procedure has been completed.')
+    return
+
+async def sync_welcome_score() :
+    welcome_channel = await ratelimited_fetch_channel(bot, WELCOME_CHANNEL_ID)
+    lookback_timestamp = datetime.now(dt.UTC) - dt.timedelta(hours = WELCOME_SYNC_LOOKBACK_INTERVAL)
+    
+    await ratelimited_channel_send(welcome_channel, 'Initiating welcome sync procedure...')
+    async for msg in ratelimited_history(welcome_channel, limit = 2000, after = lookback_timestamp, oldest_first = False) :
+        if msg.author.id == bot.user.id: continue
+        if msg.content == '$$block_sallie_welcome_detection' and msg.author.id == BOT_OWNER_ID :
+            break
+        if msg.author.bot or msg.type != discord.MessageType.reply: continue
+        await welcome_count_check(msg)
+        continue
+    await ratelimited_channel_send(welcome_channel, 'Welcome Sync procedure has been completed.')
+    return
+
 @bot.event
 async def on_message(message) :
     global voice_client, HELP_DICT, SLAPPING_SALAMANDER_SERVER_ACCENT, BOOSTER_NOTIF_CHANNEL_ID, LEVELUP_TIMES, activity_index_cache, CACHE_RETENTION_DURATION, activity_index_db_upload_time, ACTIVITY_INDEX_DB_CACHING_DURATION, current_bot_status, BOT_STATUSES, status_rotation_time, STATUS_ROTATION_DURATION, recent_welcome_message, recently_cached_messages, MESSAGE_CACHE_LIM
     
     print(f'[MESSAGE LOG]: {message.author} | {message.content}')
-    if message.interaction_metadata != None :
-        print(f'INTERACTION DETECTED SEXY BOI {message.content} | {message.interaction_metadata.interacted_message} | {message.interaction_metadata.user.name} | {message.interaction.name}')
-        
-        if message.interaction.name == 'bump' :
-            await message.channel.send(f'HEY THANKS {message.interaction_metadata.user.mention} FOR BUMPING MAN, I DETECTED IT CUZ YOU ARE SO SEXY!!!')
-            
-            name = firebase_db_obj.child('bump').child(message.interaction_metadata.user.id).child('username').get().val()
-            count = firebase_db_obj.child('bump').child(message.interaction_metadata.user.id).child('count').get().val() or 0
-            
-            print(name, count)
-            
-            firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('username').set(message.interaction_metadata.user.name)
-            firebase_db_obj.child('bump').child(str(message.interaction_metadata.user.id)).child('count').set(count + 1)
-        elif message.interaction.name == 'confess' :
-            print('THE PERSON WHO TRIED CONFESSING WAS: %s', message.interaction_metadata.user.name)
-        return
+    await bump_count_check(message)
     
     if message.type == discord.MessageType.premium_guild_subscription :
         # Its a boost notif.
@@ -1251,7 +1513,7 @@ async def on_message(message) :
         for p, part in enumerate(parts) :
             part_annotation = f'* __**Part:**__ {p + 1}\n'
             part_content = f'{initial_log_annotation}{part_annotation}> {part}'
-            await dm_log_channel.send(part_content)
+            await ratelimited_channel_send(dm_log_channel, part_content)
             continue
         
     elif message.type == discord.MessageType.reply :
@@ -1280,20 +1542,20 @@ async def on_message(message) :
     if message.created_at.replace(tzinfo = dt.UTC) > get_datetime_obj(status_rotation_time) :
         current_bot_status = random.choice([status for status in BOT_STATUSES if status != current_bot_status])
         bot_activity = discord.Game(name = current_bot_status, start = bot.user.created_at)
-        await bot.change_presence(activity = bot_activity)
+        await ratelimited_change_presence(bot, activity = bot_activity)
         status_rotation_time = get_datetime_str(get_datetime_obj(status_rotation_time) + dt.timedelta(minutes = STATUS_ROTATION_DURATION))
         
     if message.content.lower() == '$$ping' :
-        await message.channel.send('Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
+        await ratelimited_channel_send(message.channel, 'Bot has been successfully pinged({} ms)! tyy <33~'.format(round((bot.latency * 1000), 2)))
     if message.content.lower().startswith('$$help') :
         query = message.content.lower()[len('$$help') : ].strip()
         if query != '' :
             if query not in HELP_DICT :
-                await message.channel.send('The query provided is invalid, there is no such command or cog available for sallie!')
+                await ratelimited_channel_send(message.channel, 'The query provided is invalid, there is no such command or cog available for sallie!')
             else :
                 help_data = HELP_DICT[query]
                 embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = help_data[0], description = help_data[1])
-                await message.channel.send(embed = embed)
+                await ratelimited_channel_send(message.channel, embed = embed)
         else :
             embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = 'Sallie-Help', description = 'Sallie is here to help ya play with her :D! Heres a list of things sallie can do:')
             for query, query_data in HELP_DICT.items() :
@@ -1301,9 +1563,9 @@ async def on_message(message) :
                 desc = desc if len(desc) <= 1024 else desc[ : 1024]
                 embed.add_field(name = name, value = desc, inline = False)
                 continue
-            await message.channel.send(embed = embed)
+            await ratelimited_channel_send(message.channel, embed = embed)
     if message.content.lower() == '$$slap' :
-        await message.channel.send(':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
+        await ratelimited_channel_send(message.channel, ':lizard: :wave::skin-tone-1: *You slapped sallie gently and gained some slapping experience!!* Keep slapping dem cheeks you slappy boi!')
         
         name = firebase_db_obj.child('slap').child(message.author.id).child('username').get().val()
         count = firebase_db_obj.child('slap').child(message.author.id).child('count').get().val() or 0
@@ -1317,37 +1579,37 @@ async def on_message(message) :
     if message.content.startswith('$$confess ') :
         confession = message.content[len('$$confess') : ]
         embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = 'Anonymous Confession', description = confession)
-        confession_channel = [channel for channel in bot.guilds[0].channels if channel.id == CONFESSION_CHANNEL_ID][0] if bot.guilds else (await bot.fetch_channel(CONFESSION_CHANNEL_ID))
-        confession_msg = await confession_channel.send(embed = embed)
+        confession_channel = [channel for channel in bot.guilds[0].channels if channel.id == CONFESSION_CHANNEL_ID][0] if bot.guilds else (await ratelimited_fetch_channel(bot, CONFESSION_CHANNEL_ID))
+        confession_msg = await ratelimited_channel_send(confession_channel, embed = embed)
         if not isinstance(message.channel, discord.DMChannel) :
-            await message.delete()
+            await ratelimited_message_delete(message)
             if not message.author.dm_channel :
-                await message.author.create_dm()
-            await message.author.dm_channel.send(f'Confession sent!! {confession_msg.jump_url}')
+                await ratelimited_create_dm(message.author)
+            await message.author.dm_channelratelimited_channel_send(f'Confession sent!! {confession_msg.jump_url}')
         else :
-            await message.reply(f'Confession sent!! {confession_msg.jump_url}')
+            await ratelimited_reply(message, f'Confession sent!! {confession_msg.jump_url}')
     if message.content.lower() == '$$vc_connect' :
         try :
             voice_client = await message.author.voice.channel.connect()
-            await message.channel.send('Connected to {vc_name}!'.format(vc_name = message.author.voice.channel.name))
+            await ratelimited_channel_send(message.channel, 'Connected to {vc_name}!'.format(vc_name = message.author.voice.channel.name))
         except :
             if message.author.voice.channel == None :
-                await message.channel.send('You are not in a VC rn! Join a VC first!!')
+                await ratelimited_channel_send(message.channel, 'You are not in a VC rn! Join a VC first!!')
             else :
-                await message.channel.send('Could not connect to VC due to some issue.')
+                await ratelimited_channel_send(message.channel, 'Could not connect to VC due to some issue.')
     if message.content.lower() == '$$vc_disconnect' :
         if voice_client == None :
-            await message.channel.send('The bot is not in a VC rn.')
+            await ratelimited_channel_send(message.channel, 'The bot is not in a VC rn.')
         else :
             if voice_client.is_playing() :
                 voice_client.stop()
-            await voice_client.disconnect()
+            await ratelimited_voice_client_disconnect(voice_client)
             voice_client = None
-            await message.channel.send('Disconnected!')
+            await ratelimited_channel_send(message.channel, 'Disconnected!')
             # music_queue.clear()
             # music_cmd_channel_id, currently_playing = None, None
     if message.content.lower().startswith('$$tts ') :
-        await message.add_reaction('🔊')
+        await ratelimited_add_reaction(message, '🔊')
         tts_obj = gTTS(text = message.content.lower()[len('$$tts ') : ], tld = 'us', slow = False)
         tts_obj.save('temp_tts.mp3')
         if voice_client == None :
@@ -1358,12 +1620,12 @@ async def on_message(message) :
                     voice_client.play(audio_source, after = None)
                 while voice_client.is_playing() :
                     await asyncio.sleep(1)
-                await voice_client.disconnect()
+                await ratelimited_voice_client_disconnect(voice_client)
             except :
                 if message.author.voice.channel == None :
-                    await message.channel.send('You are not in a VC rn! Join a VC first!!')
+                    await ratelimited_channel_send(message.channel, 'You are not in a VC rn! Join a VC first!!')
                 else :
-                    await message.channel.send('Could not connect to VC due to some issue.')
+                    await ratelimited_channel_send(message.channel, 'Could not connect to VC due to some issue.')
         else :
             audio_source = discord.FFmpegPCMAudio('temp_tts.mp3')
             if not voice_client.is_playing():
@@ -1383,30 +1645,30 @@ async def on_message(message) :
             embed.add_field(name = name, value = desc, inline = False)
             rank += 1
             continue
-        await message.channel.send(embed = embed)
+        await ratelimited_channel_send(message.channel, embed = embed)
     if message.content.lower().startswith('$$revive') :
         list_of_revivals = []
         for mention in message.mentions :
             if mention == message.author : continue
             if mention.dm_channel == None :
-                await mention.create_dm()
+                await ratelimited_create_dm(mention)
             try :
-                await mention.dm_channel.send('Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + message.channel.mention)
+                await ratelimited_channel_send(mention.dm_channel, 'Hii!! Sallie this side ^^! You stopped slapping me :<! Me and the others really miss you :3 will you take some time to visit our server again? It\'d make us all soo happy :D!! ' + message.channel.mention)
                 list_of_revivals.append(mention.name)
             except :
                 pass
             continue
         if list_of_revivals :
-            await message.channel.send('Revival message sent to {revivals}!'.format(revivals = ', '.join(list_of_revivals)))
+            await ratelimited_channel_send(message.channel, 'Revival message sent to {revivals}!'.format(revivals = ', '.join(list_of_revivals)))
         else :
-            await message.channel.send('You cannot revive yourself silly! You are already alive!! Grrrr')
+            await ratelimited_channel_send(message.channel, 'You cannot revive yourself silly! You are already alive!! Grrrr')
     if message.content.lower() == '$$my_discord_id' :
-        await message.channel.send(f'Your discord ID is: ```{message.author.id}```')
+        await ratelimited_channel_send(message.channel, f'Your discord ID is: ```{message.author.id}```')
     if message.author.id == BOT_OWNER_ID and message.content.lower().startswith('$$boost ') :
         booster = message.mentions[0]
         
         await on_boost(booster)
-        await message.channel.send('Noted master adi! I have modified my databases as per ur wishes hehe!!')
+        await ratelimited_channel_send(message.channel, 'Noted master adi! I have modified my databases as per ur wishes hehe!!')
         return
     if message.content.lower().startswith('$$rank') or message.content.lower().startswith('$$level') :
         await generate_rank_card(message)
@@ -1415,34 +1677,34 @@ async def on_message(message) :
             content = ' '.join(message.content.split(' ')[2 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
                 matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
-                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
-                # parent_msg = message.reference.cached_message or (await message.channel.fetch_message(message.reference.message_id))
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id)))
+                # parent_msg = message.reference.cached_message or (await ratelimited_fetch_message(message.channel, message.reference.message_id))
                 content = parent_msg.content
             channel = message.channel_mentions[0]
-            await channel.send(f'{content}')
-            await message.channel.send('Echoed successfully!')
+            await ratelimited_channel_send(channel, f'{content}')
+            await ratelimited_channel_send(message.channel, 'Echoed successfully!')
         except :
-            await message.channel.send('Something went wrong when trying to execute this command :<')
+            await ratelimited_channel_send(message.channel, 'Something went wrong when trying to execute this command :<')
     if message.content.lower().startswith('$$echo_dm') and message.author.id == BOT_OWNER_ID :
         try :
             content = ' '.join(message.content.split(' ')[2 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
                 matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
-                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id)))
                 content = parent_msg.content
             mention = message.mentions[0]
             if mention != message.author : 
                 if mention.dm_channel == None :
-                    await mention.create_dm()
+                    await ratelimited_create_dm(mention)
                 try :
-                    await mention.dm_channel.send(f'{content}')
-                    await message.channel.send(f'DM Sent to {mention.mention} successfully!')
+                    await mention.dm_channelratelimited_channel_send(f'{content}')
+                    await ratelimited_channel_send(message.channel, f'DM Sent to {mention.mention} successfully!')
                 except :
-                    await message.channel.send(f'DM could not be sent to {mention.mention} :disappointed: . They have me blocked! Please punish them for this adi master >w<~!')
+                    await ratelimited_channel_send(message.channel, f'DM could not be sent to {mention.mention} :disappointed: . They have me blocked! Please punish them for this adi master >w<~!')
             else :
-                await message.channel.send('Why you tryna dm your own self cutie patootie~?')
+                await ratelimited_channel_send(message.channel, 'Why you tryna dm your own self cutie patootie~?')
         except :
-            await message.channel.send('Something went wrong when trying to execute this command :<')
+            await ratelimited_channel_send(message.channel, 'Something went wrong when trying to execute this command :<')
     if message.content.lower().startswith('$$echo_reply') and message.author.id == BOT_OWNER_ID :
         # $$echo_reply <channel_mention> <message_id> <content>
         try :
@@ -1450,23 +1712,23 @@ async def on_message(message) :
             content = ' '.join(cmd_args[3 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
                 matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
-                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id)))
                 content = parent_msg.content
             channel = message.channel_mentions[0]
             message_id = int(cmd_args[2])
             
             try :
                 msg = channel.get_partial_message(message_id)
-                await msg.reply(f'{content}')
+                await ratelimited_reply(msg, f'{content}')
             except :
                 matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message_id]
-                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
+                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id)))
                 # msg = await channel.fetch_message(message_id)
-                await msg.reply(f'{content}')
+                await ratelimited_reply(msg, f'{content}')
 
-            await message.channel.send('Reply sent successfully!')
+            await ratelimited_channel_send(message.channel, 'Reply sent successfully!')
         except :
-            await message.channel.send('Something went wrong when trying to execute this command :<')
+            await ratelimited_channel_send(message.channel, 'Something went wrong when trying to execute this command :<')
     if message.content.lower().startswith('$$echo_dm_reply') and message.author.id == BOT_OWNER_ID :
         # $$echo_dm_reply <mention> <message_id> <content>
         try :
@@ -1474,7 +1736,7 @@ async def on_message(message) :
             content = ' '.join(cmd_args[3 : ])
             if (content.replace(' ', '') == '') and message.type == discord.MessageType.reply :
                 matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]
-                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
+                parent_msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id)))
                 content = parent_msg.content
             mention = message.mentions[0]
             channel = mention.dm_channel
@@ -1482,15 +1744,15 @@ async def on_message(message) :
             
             try :
                 msg = channel.get_partial_message(message_id)
-                await msg.reply(f'{content}')
+                await ratelimited_reply(msg, f'{content}')
             except :
                 matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message_id]
-                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
-                await msg.reply(f'{content}')
+                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id)))
+                await ratelimited_reply(msg, f'{content}')
 
-            await message.channel.send('Reply sent successfully!')
+            await ratelimited_channel_send(message.channel, 'Reply sent successfully!')
         except :
-            await message.channel.send('Something went wrong when trying to execute this command :<')
+            await ratelimited_channel_send(message.channel, 'Something went wrong when trying to execute this command :<')
     if message.content.lower().startswith('$$echo_react') and message.author.id == BOT_OWNER_ID :
         # $$echo_react <channel_mention> <message_id> <reaction>
         try :
@@ -1507,26 +1769,26 @@ async def on_message(message) :
             
             try :
                 msg = channel.get_partial_message(message_id)
-                await msg.add_reaction(emoji)
+                await ratelimited_add_reaction(msg, emoji)
             except :
                 matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message_id]
-                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await message.channel.fetch_message(message.reference.message_id)))
-                await msg.add_reaction(emoji)
+                msg = matching_recent_messages[0] if any(matching_recent_messages) else ((message.reference.cached_message) or (await ratelimited_fetch_message(message.channel, message.reference.message_id)))
+                await ratelimited_add_reaction(msg, emoji)
 
-            await message.channel.send('Reacted to the message successfully!')
+            await ratelimited_channel_send(message.channel, 'Reacted to the message successfully!')
         except Exception as e :
             print(e)
             
-            await message.channel.send('Something went wrong when trying to execute this command :<')
+            await ratelimited_channel_send(message.channel, 'Something went wrong when trying to execute this command :<')
     if message.content.lower() in ['$$server_website', '$$website'] :
-        await message.channel.send('Here ya go! Lemme link you up with the server\'s website really quickly :3! https://sallie-bot.onrender.com/home ')
+        await ratelimited_channel_send(message.channel, 'Here ya go! Lemme link you up with the server\'s website really quickly :3! https://sallie-bot.onrender.com/home ')
     if message.content.lower().startswith('$$activity_index ') :
         try :
             duration = message.content.lower()[len('$$activity_index ') : ]
             duration_parts = duration.strip().split(' ')
 
             if duration_parts == [] :
-                await message.channel.send('Proper lookback duration has not been provided for calculation of activity index.')
+                await ratelimited_channel_send(message.channel, 'Proper lookback duration has not been provided for calculation of activity index.')
             else :
                 hour_instances = [h for h in duration_parts if h.endswith('h')]
                 min_instances = [m for m in duration_parts if m.endswith('m')]
@@ -1537,17 +1799,17 @@ async def on_message(message) :
                 seconds = int(sec_instances[0][ : -1]) if sec_instances else 0.0
     
                 # if hours == minutes == seconds == 0.0 :
-                #     await message.channel.send('Proper lookback duration has not been provided for calculation of activity index.')
+                #     await ratelimited_channel_send(message.channel, 'Proper lookback duration has not been provided for calculation of activity index.')
                 # else :
                 activity_index = calculate_activity_index(dt.timedelta(hours = hours, minutes = minutes, seconds = seconds))
-                await message.channel.send(f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
+                await ratelimited_channel_send(message.channel, f'YESH! BEEP BOOP... 🤖🦎 *robotic lizard noises*, calculating.. activity.. index... boop. beep.\n* Activity Index: \n```{activity_index}```\n')
         except ValueError as e:
             print(e)
-            await message.channel.send('Command syntax was not followed and the lookback duration arguments were not integers. Try again.')
+            await ratelimited_channel_send(message.channel, 'Command syntax was not followed and the lookback duration arguments were not integers. Try again.')
     if message.content.lower().startswith('$$activity_graph ') or message.content.lower().startswith('$$activity_chart ') :
         args = message.content.lower()[len('$$activity_graph ') : ].strip().split(' ')
         if len(args) < 2 :
-            await message.channel.send('Arguments not passed properly to the command, to generate an activity chart, I need the chart mode and lookback duration!! <33 Please try again~')
+            await ratelimited_channel_send(message.channel, 'Arguments not passed properly to the command, to generate an activity chart, I need the chart mode and lookback duration!! <33 Please try again~')
         else :
             mode = args[0]
             mode_aliases = {'h': ['hr', 'hrs', 'hour', 'hours'], 'm': ['min', 'mins', 'minute', 'minutes'], 's': ['sec', 'secs', 'second', 'seconds']}
@@ -1557,12 +1819,12 @@ async def on_message(message) :
                     break
                 continue
             if mode not in 'hms':
-                await message.channel.send('ERMM... WHAT THE SIGMA~ You passed an invalid mode type sweetheart 😊✨!')
+                await ratelimited_channel_send(message.channel, 'ERMM... WHAT THE SIGMA~ You passed an invalid mode type sweetheart 😊✨!')
             else :
                 grid_bool = ([arg == '-g' for arg in args[1 : ] if arg == '-g'] or [False])[0]
                 duration_parts = args[1 : ]
                 if duration_parts == [] :
-                    await message.channel.send('Proper lookback duration has not been provided for plotting of the activity chart.')
+                    await ratelimited_channel_send(message.channel, 'Proper lookback duration has not been provided for plotting of the activity chart.')
                 else :
                     hour_instances = [h for h in duration_parts if h.endswith('h')]
                     min_instances = [m for m in duration_parts if m.endswith('m')]
@@ -1585,12 +1847,12 @@ async def on_message(message) :
                     embed.set_image(url = "attachment://graph.png")
                 
                     # Send the embed with the attached graph
-                    await message.channel.send(file = chart_file, embed = embed)
+                    await ratelimited_channel_send(message.channel, file = chart_file, embed = embed)
                     pass
     if message.content.lower().startswith('$$debug_get ') :
         arg = message.content[len('$$debug_get ') : ]
         if arg not in globals() :
-            await message.channel.send('Invalid variable queried, not available in globals.')
+            await ratelimited_channel_send(message.channel, 'Invalid variable queried, not available in globals.')
         else :
             debug_val_content = f'{globals()[arg]}'
             parts = []
@@ -1604,7 +1866,7 @@ async def on_message(message) :
             if (end - start) != 0: parts.append(debug_val_content[start : end])
 
             for part in parts :
-                await message.channel.send(f'```py\n{part}```')
+                await ratelimited_channel_send(message.channel, f'```py\n{part}```')
                 continue
     if message.content.lower().startswith('$$debug_set ') :
         try :
@@ -1613,11 +1875,73 @@ async def on_message(message) :
             var_name = args[0].strip()
             var_value = '='.join(args[1 : ])
             globals()[var_name] = var_value
-            await message.channel.send(f'Global variable with the name {var_name} has been set to the value provided.')
+            await ratelimited_channel_send(message.channel, f'Global variable with the name {var_name} has been set to the value provided.')
         except Exception as e :
             print(e)
-            await message.channel.send('Something went wrong, could not set the variable globally. Try again or give up baby boy~')
+            await ratelimited_channel_send(message.channel, 'Something went wrong, could not set the variable globally. Try again or give up baby boy~')
+    if message.content.lower().startswith('$$hug') :
+        mentions = [mention for mention in message.mentions if mention != message.author]
+        if len(mentions) == 0 :
+            await ratelimited_channel_send(message.channel, 'awhh Imma hug you instead!! Here~ here~ *hugs you tightly*')
+        elif len(mentions) == 1 :
+            gifs = get_tenor_gifs('anime hug', 210)
+            if len(gifs) != 0 :
+                cute_descriptions = ['{a} gave {b} a really tight hug!', '{a} just hugged {b} tightly!', '{a} squeezed {b} to happiness with their hug :D!']
+                get_nick = lambda member : [nick for nick in [member.nick, member.display_name, member.name] if nick != None][0]
+                img_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), description = random.choice([desc.format(a = get_nick(message.author), b = get_nick(mentions[0])) for desc in cute_descriptions]))
+                img_embed.set_author(name = get_nick(message.author), icon_url = message.author.avatar)
+                img_embed.set_image(url = random.choice(gifs))
+                await ratelimited_channel_send(message.channel, embed = img_embed)
+            else :
+                await ratelimited_channel_send(message.channel, 'The bot was not able to load a gif due to some issue.')
+        elif len(mentions) > 1 :
+            gifs = get_tenor_gifs('anime group hug', 210)
+            if len(gifs) != 0 :
+                cute_descriptions = ['{huggers} just performed a cute group hug!', '{huggers} hugged each other tightly!!', 'Look at them go!! {huggers} just cutely gave each other a group hug!']
+                get_nick = lambda member : [nick for nick in [member.nick, member.display_name, member.name] if nick != None][0]
+                huggers = ', '.join([get_nick(member) for member in [message.author] + mentions[ : -1]]) + ' and ' +  get_nick(mentions[-1])
+                img_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), description = random.choice([desc.format(huggers = huggers) for desc in cute_descriptions]))
+                img_embed.set_author(name = get_nick(message.author), icon_url = message.author.avatar)
+                img_embed.set_image(url = random.choice(gifs))
+                await ratelimited_channel_send(message.channel, embed = img_embed)
+            else :
+                await ratelimited_channel_send(message.channel, 'The bot was not able to load a gif due to some issue.')
+    if message.content.lower().startswith('$$kiss') :
+        mentions = [mention for mention in message.mentions if mention != message.author]
+        if len(mentions) == 0 :
+            await ratelimited_channel_send(message.channel, 'awhh naughty, naughty! want a kiss? aight bet! *kisses you*')
+        elif len(mentions) == 1 :
+            gifs = get_tenor_gifs('anime kiss', 210)
+            if len(gifs) != 0 :
+                cute_descriptions = ['{a} kissed {b}!', '{a} kissed {b} with immense passion and love!!', 'OMG!! {a} and {b} are making out~!']
+                get_nick = lambda member : [nick for nick in [member.nick, member.display_name, member.name] if nick != None][0]
+                img_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), description = random.choice([desc.format(a = get_nick(message.author), b = get_nick(mentions[0])) for desc in cute_descriptions]))
+                img_embed.set_author(name = get_nick(message.author), icon_url = message.author.avatar)
+                img_embed.set_image(url = random.choice(gifs))
+                await ratelimited_channel_send(message.channel, embed = img_embed)
+            else :
+                await ratelimited_channel_send(message.channel, 'The bot was not able to load a gif due to some issue.')
+        elif len(mentions) > 1 :
+            await ratelimited_channel_send(message.channel, 'You cannot kiss more than a single person at a time!! TOO BAD HAHAHAH')
+    if message.content.lower().startswith('$$ekill') :
+        mentions = [mention for mention in message.mentions if mention != message.author]
+        if len(mentions) == 0 :
+            await ratelimited_channel_send(message.channel, 'HEY!! If you really feel like hurting urself, then go donate blood!! But do not give away ur life man, it matters!!')
+        elif len(mentions) == 1 :
+            gifs = get_tenor_gifs('anime kill', 210)
+            if len(gifs) != 0 :
+                cute_descriptions = ['{a} mercilessly murdered {b}!', '{a} brutally took the life of {b}!', '{a} killed {b}!']
+                get_nick = lambda member : [nick for nick in [member.nick, member.display_name, member.name] if nick != None][0]
+                img_embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), description = random.choice([desc.format(a = get_nick(message.author), b = get_nick(mentions[0])) for desc in cute_descriptions]))
+                img_embed.set_author(name = get_nick(message.author), icon_url = message.author.avatar)
+                img_embed.set_image(url = random.choice(gifs))
+                await ratelimited_channel_send(message.channel, embed = img_embed)
+            else :
+                await ratelimited_channel_send(message.channel, 'An issue occured :< and sallie was not able to find the right GIF for chu~ Sowwy!! 🥺')
+        elif len(mentions) > 1 :
+            await ratelimited_channel_send(message.channel, 'You can only kill one person at a time!')
     
+    # ---
     
     if (not message.author.bot) and (not message.channel.id == SPAM_CHANNEL_ID) :
         if message.author.id in LEVELUP_TIMES :
@@ -1635,7 +1959,7 @@ async def on_message(message) :
         xp += get_boost_gain(random.uniform(15, 25), message.author, float_allowed = True)
         new_level = calculate_level(xp, level_func)
         if ((new_level - level) > 0) :
-            await message.channel.send(level_msg_template.format(mention = message.author.mention, level = new_level))
+            await ratelimited_channel_send(message.channel, level_msg_template.format(mention = message.author.mention, level = new_level))
         
         firebase_db_obj.child('levels').child(str(message.author.id)).child('username').set(message.author.name)
         firebase_db_obj.child('levels').child(str(message.author.id)).child('xp').set(xp)
