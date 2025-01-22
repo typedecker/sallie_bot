@@ -18,3 +18,6 @@ while __name__ == '__main__':
     except discord.errors.HTTPException as e:
         print(e)
         print("\n\n\nBLOCKED BY RATE LIMITS\nRESTARTING NOW\n\n\n")
+    except RuntimeError as e :
+        print(e)
+        print('PYTHON IS BEING BUGGY')
