@@ -1051,7 +1051,8 @@ def run() :
             app.run(host="0.0.0.0", port = PORT)
             port_found = True
             print('Bot is now running on port: {port}'.format(port = PORT))
-        except :
+        except Exception as e :
+            print(f'Error while tryna use current port: {e}')
             print('Port({port}) is already in use, checking a new port...'.format(port = PORT))
             port_found = False
             PORT += 1
