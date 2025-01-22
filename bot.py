@@ -5,6 +5,7 @@ Created on Tue May 21 20:02:05 2024
 @author: ketch
 """
 
+# ENVIRONMENT_TYPE = 'DEV'
 ENVIRONMENT_TYPE = 'PROD'
 print(f'STARTING SALLIE BOT CODE IN {ENVIRONMENT_TYPE} MODE.')
 
@@ -577,19 +578,6 @@ def fetch_level_data() :
                                               'level': salaslapper_data['level'] if 'level' in salaslapper_data else 0}
         continue
     return data
-
-def fetch_counter_leaderboard_str(counter_type) :
-    # LEVEL COUNTER NOT INCLUDED.
-    data = fetch_counter_data(counter_type)
-    
-    leaderboard_str = ''
-    
-    rank = 0
-    for data_key in sorted(data, key = data.get, reverse = True) :
-        leaderboard_str += f'{rank}.{data_key}: {data[data_key]} pts\n'
-        rank += 1
-        continue
-    return leaderboard_str
 
 # --------------------------------------
 
@@ -1264,6 +1252,7 @@ async def welcome_count_check(message) :
     
     matching_recent_messages = [msg for msg in recently_cached_messages if msg.id == message.reference.message_id]    
     
+    og_msg = None
     if recent_welcome_message != None :
         if (recent_welcome_message.id == message.reference.message_id) :
             og_msg = recent_welcome_message 
@@ -1455,8 +1444,7 @@ async def sync_bump_score() :
             break
         
         if msg.author.id == DISBOARD_BOT_ID :
-            print(msg.reactions)
-            if not any([reaction == emoji for reaction in msg.reactions]) :
+            if not any([(reaction.emoji == emoji and reaction.me) for reaction in msg.reactions]) :
                 await bump_count_check(msg)
         continue
     await ratelimited_channel_send(bump_channel, 'Bump Sync procedure has been completed.')
@@ -1632,19 +1620,37 @@ async def on_message(message) :
                 voice_client.play(audio_source, after = None)
     if message.content.lower().startswith('$$lb ') :
         lb_type = message.content.lower()[len('$$lb ') : ]
-        lb_data = fetch_counter_data(lb_type)
-
         verb = {'slap': 'slapping', 'bump': 'bumping', 'welcome': 'welcoming', 'level': 'levels/xp'}
         embed = discord.Embed(color = discord.Colour.from_str(SLAPPING_SALAMANDER_SERVER_ACCENT), title = f'{lb_type.title()} Leaderboards',
                               description = f'Given below is the top 25 leaderboard for {verb[lb_type]}:')
         
-        rank = 1
-        for member_name in sorted(lb_data, key = lb_data.get, reverse = True)[:25] :
-            name = f'{rank}. {member_name}'
-            desc = f'{lb_data[member_name]} points'
-            embed.add_field(name = name, value = desc, inline = False)
-            rank += 1
-            continue
+        if lb_type == 'level' :
+            lb_data = fetch_level_data()
+            
+            rank = 1
+            for member_name in sorted(lb_data, key = lambda k: lb_data.get(k)['xp'], reverse = True)[ : 25] :
+                name = f'{rank}. {member_name} (Level: {lb_data[member_name]["level"]})'
+                
+                xp = round(lb_data[member_name]['xp'], 1)
+                if xp >= 1000000 :
+                    xp = str(round((xp / 1000), 2)) + 'M'
+                elif xp >= 1000 :
+                    xp = str(round((xp / 1000), 1)) + 'k'
+                desc = f'XP: {xp} points'
+                
+                embed.add_field(name = name, value = desc, inline = False)
+                rank += 1
+                continue
+        else :
+            lb_data = fetch_counter_data(lb_type)
+            
+            rank = 1
+            for member_name in sorted(lb_data, key = lb_data.get, reverse = True)[ : 25] :
+                name = f'{rank}. {member_name}'
+                desc = f'{lb_data[member_name]} points'
+                embed.add_field(name = name, value = desc, inline = False)
+                rank += 1
+                continue
         await ratelimited_channel_send(message.channel, embed = embed)
     if message.content.lower().startswith('$$revive') :
         list_of_revivals = []
