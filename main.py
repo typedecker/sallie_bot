@@ -14,7 +14,7 @@ while __name__ == '__main__':
     try :
         bot.keep_alive()
         asyncio.run(bot.BOT_MAIN_FUNC(os.environ['BOT_TOKEN']))
-        # bot.run()
+        bot.run()
     except discord.errors.HTTPException as e:
         print(e)
         print("\n\n\nBLOCKED BY RATE LIMITS\nRESTARTING NOW\n\n\n")
